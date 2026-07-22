@@ -1,0 +1,6 @@
+{
+  "name": "Outsource Database",
+  "description": "Cloud storage and analytics for medical outsource scanned PDF reports.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,27 @@
+{
+  "entities": {
+    "medical_reports": {
+      "title": "Medical Reports",
+      "description": "Scanned PDF outsource medical reports and metadata",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "fileName": { "type": "string" },
+        "fileSize": { "type": "number" },
+        "fileType": { "type": "string" },
+        "category": { "type": "string" },
+        "subCategory": { "type": "string" },
+        "hospital": { "type": "string" },
+        "customHospital": { "type": "string" },
+        "reportDate": { "type": "string" },
+        "uploadDate": { "type": "string" },
+        "hasCDROM": { "type": "boolean" },
+        "notes": { "type": "string" },
+        "userId": { "type": "string" },
+        "downloadUrl": { "type": "string" },
+        "storagePath": { "type": "string" }
+      },
+      "required": ["fileName", "fileSize", "category", "hospital", "userId"]
+    }
+  }
+}
