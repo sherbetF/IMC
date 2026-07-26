@@ -49,11 +49,30 @@ export const PdfPreviewModal: React.FC<PdfPreviewModalProps> = ({ report, onClos
       return;
     }
 
+    let isMounted = true;
     let urlToUse = '';
     let tempBlobUrl: string | null = null;
 
     if (report.downloadUrl && report.downloadUrl.startsWith('http')) {
       urlToUse = report.downloadUrl;
+      setActiveSrc(report.downloadUrl);
+
+      // Asynchronously fetch blob to convert to local Object URL for smooth native PDF rendering
+      fetch(report.downloadUrl)
+        .then((res) => {
+          if (!res.ok) throw new Error('Network response not ok');
+          return res.blob();
+        })
+        .then((blob) => {
+          if (isMounted) {
+            tempBlobUrl = URL.createObjectURL(blob);
+            setCreatedBlobUrl(tempBlobUrl);
+            setActiveSrc(tempBlobUrl);
+          }
+        })
+        .catch((err) => {
+          console.warn('Direct blob fetch notice, using downloadUrl directly:', err);
+        });
     } else if (report.fileData) {
       if (report.fileData.startsWith('data:application/pdf;base64,')) {
         try {
@@ -75,22 +94,20 @@ export const PdfPreviewModal: React.FC<PdfPreviewModalProps> = ({ report, onClos
           urlToUse = report.fileData;
         }
       }
-    }
-
-    // Fallback to sample generator if no URL resolved
-    if (!urlToUse) {
+      setActiveSrc(urlToUse);
+      setCreatedBlobUrl(tempBlobUrl);
+    } else {
       urlToUse = generateSamplePdfDataUri(
         report.fileName,
         report.hospital,
         `${report.category} (${report.subCategory})`,
         report.reportDate
       );
+      setActiveSrc(urlToUse);
     }
 
-    setActiveSrc(urlToUse);
-    setCreatedBlobUrl(tempBlobUrl);
-
     return () => {
+      isMounted = false;
       if (tempBlobUrl) {
         URL.revokeObjectURL(tempBlobUrl);
       }

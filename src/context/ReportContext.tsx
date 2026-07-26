@@ -277,6 +277,7 @@ export const ReportProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         
         const uploadSnapshot = await uploadBytes(storageRef, rawFile, {
           contentType: rawFile.type || 'application/pdf',
+          contentDisposition: 'inline',
           customMetadata: {
             patientName: newReportData.patientName || '',
             hospital: newReportData.hospital || ''
@@ -299,10 +300,15 @@ export const ReportProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       fileData: base64FileData || undefined
     };
 
-    // Sanitize fileData for Firestore doc size safety (keep base64 if <= 750KB or if downloadUrl is empty)
-    const firestoreFileData = (downloadUrl && base64FileData.length > 500000)
-      ? ''
-      : (base64FileData.length < 800000 ? base64FileData : '');
+    // Sanitize fileData for Firestore doc size safety (Firestore limit is 1MB / ~1,048,576 bytes)
+    // If downloadUrl is present (Storage upload succeeded), we don't need large base64 string in Firestore.
+    // If downloadUrl is empty, keep base64FileData in Firestore (up to ~850,000 chars) so other devices can access the file.
+    let firestoreFileData = '';
+    if (downloadUrl) {
+      firestoreFileData = (base64FileData && base64FileData.length < 100000) ? base64FileData : '';
+    } else {
+      firestoreFileData = (base64FileData && base64FileData.length < 850000) ? base64FileData : '';
+    }
 
     try {
       const colRef = collection(db, 'medical_reports');

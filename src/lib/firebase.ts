@@ -17,11 +17,15 @@ const firebaseConfig = {
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 export const auth = getAuth(app);
 
-// Use custom firestore databaseId if defined
-const databaseId = import.meta.env.VITE_FIREBASE_DATABASE_ID || firebaseConfigJson.firestoreDatabaseId || undefined;
-export const db = getFirestore(app, databaseId);
+// Use custom firestore databaseId from config or env
+const databaseId = (import.meta.env.VITE_FIREBASE_DATABASE_ID || firebaseConfigJson.firestoreDatabaseId || '').trim();
 
-// Initialize Firebase Storage
-export const storage = getStorage(app);
+// Pass databaseId to getFirestore so it connects to the project's named database
+export const db = databaseId ? getFirestore(app, databaseId) : getFirestore(app);
+
+// Initialize Firebase Storage with explicit bucket URL
+const bucketName = (import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || firebaseConfigJson.storageBucket || '').trim();
+const bucketUrl = bucketName ? (bucketName.startsWith('gs://') ? bucketName : `gs://${bucketName}`) : undefined;
+export const storage = getStorage(app, bucketUrl);
 
 export default app;
