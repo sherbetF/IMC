@@ -251,25 +251,8 @@ export const ReportProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     let downloadUrl = newReportData.downloadUrl || '';
     let storagePath = newReportData.storagePath || '';
-    let base64FileData = '';
 
-    // Convert rawFile to base64 Data URL so file content can be stored/viewed even if Storage bucket is restricted
-    if (rawFile) {
-      try {
-        base64FileData = await new Promise<string>((resolve) => {
-          const reader = new FileReader();
-          reader.onload = (e) => resolve((e.target?.result as string) || '');
-          reader.onerror = () => resolve('');
-          reader.readAsDataURL(rawFile);
-        });
-      } catch (readErr) {
-        console.warn('Error reading file as Base64:', readErr);
-      }
-    } else if (newReportData.fileData && !newReportData.fileData.startsWith('blob:')) {
-      base64FileData = newReportData.fileData;
-    }
-
-    // Attempt Firebase Storage upload for all files when rawFile exists
+    // Upload raw file to Firebase Storage
     if (rawFile) {
       try {
         if (!auth.currentUser) {
@@ -295,7 +278,7 @@ export const ReportProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             }
           });
           downloadUrl = await getDownloadURL(uploadSnapshot.ref);
-          console.log('Firebase Storage upload succeeded:', downloadUrl);
+          console.log('Firebase Storage file upload succeeded:', downloadUrl);
         } catch (primaryStorageErr) {
           console.warn('Primary Firebase Storage upload warning, attempting default storage bucket...', primaryStorageErr);
           try {
@@ -308,11 +291,11 @@ export const ReportProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             downloadUrl = await getDownloadURL(uploadSnapshot.ref);
             console.log('Fallback Firebase Storage upload succeeded:', downloadUrl);
           } catch (fallbackErr) {
-            console.warn('Secondary Firebase Storage upload notice:', fallbackErr);
+            console.error('Firebase Storage upload error:', fallbackErr);
           }
         }
       } catch (storageErr) {
-        console.warn('Firebase Storage upload warning, storing record with metadata and Base64 fallback:', storageErr);
+        console.error('Firebase Storage upload exception:', storageErr);
       }
     }
 
@@ -323,19 +306,8 @@ export const ReportProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       userId: currentUser.uid,
       downloadUrl: downloadUrl || undefined,
       storagePath: storagePath || undefined,
-      fileData: base64FileData || undefined
+      fileData: undefined
     };
-
-    // Sanitize fileData for Firestore doc size safety (Firestore limit is 1MB / ~1,048,576 bytes)
-    // Keep base64FileData up to 850,000 characters (~600KB) so that even if Storage is restricted on some mobile networks, other devices can view the PDF directly!
-    let firestoreFileData = '';
-    if (base64FileData && base64FileData.length < 850000) {
-      firestoreFileData = base64FileData;
-    } else if (downloadUrl) {
-      firestoreFileData = '';
-    } else {
-      firestoreFileData = base64FileData.substring(0, 850000);
-    }
 
     try {
       const colRef = collection(db, 'medical_reports');
@@ -358,14 +330,14 @@ export const ReportProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         userId: reportToSave.userId,
         downloadUrl: downloadUrl || '',
         storagePath: storagePath || '',
-        fileData: firestoreFileData
+        fileData: ''
       }));
 
       reportToSave.id = docRef.id;
       setReports((prev) => [reportToSave, ...prev.filter((r) => r.id !== reportToSave.id)]);
-      console.log('Successfully saved report to Firebase Firestore with ID:', docRef.id);
+      console.log('Successfully saved report document to Firestore with downloadUrl:', downloadUrl);
     } catch (err) {
-      console.error('Error adding report to Firestore:', err);
+      console.error('Error adding report document to Firestore:', err);
       setReports((prev) => [reportToSave, ...prev]);
     }
   };
