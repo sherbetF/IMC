@@ -250,11 +250,28 @@ export const ReportProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     let downloadUrl = newReportData.downloadUrl || '';
     let storagePath = newReportData.storagePath || '';
+    let base64FileData = '';
 
-    // Upload file to Firebase Storage if rawFile exists and user is NOT demo user
-    if (rawFile && !isDemoUser) {
+    // Convert rawFile to base64 Data URL so file content can be stored/viewed even if Storage bucket is restricted
+    if (rawFile) {
       try {
-        const cleanFileName = rawFile.name.replace(/[^a-zA-Z0-9_.-]/g, '_');
+        base64FileData = await new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onload = (e) => resolve((e.target?.result as string) || '');
+          reader.onerror = () => resolve('');
+          reader.readAsDataURL(rawFile);
+        });
+      } catch (readErr) {
+        console.warn('Error reading file as Base64:', readErr);
+      }
+    } else if (newReportData.fileData && !newReportData.fileData.startsWith('blob:')) {
+      base64FileData = newReportData.fileData;
+    }
+
+    // Attempt Firebase Storage upload for all files when rawFile exists
+    if (rawFile) {
+      try {
+        const cleanFileName = (rawFile.name || 'medical_report.pdf').replace(/[^a-zA-Z0-9_.-]/g, '_');
         storagePath = `medical_reports/${currentUser.uid}/${Date.now()}_${cleanFileName}`;
         const storageRef = ref(storage, storagePath);
         
@@ -268,7 +285,7 @@ export const ReportProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
         downloadUrl = await getDownloadURL(uploadSnapshot.ref);
       } catch (storageErr) {
-        console.warn('Firebase Storage upload warning, continuing with metadata/dataUri:', storageErr);
+        console.warn('Firebase Storage upload warning, storing record with metadata and Base64 fallback:', storageErr);
       }
     }
 
@@ -278,31 +295,44 @@ export const ReportProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       uploadDate: new Date().toISOString(),
       userId: currentUser.uid,
       downloadUrl: downloadUrl || undefined,
-      storagePath: storagePath || undefined
+      storagePath: storagePath || undefined,
+      fileData: base64FileData || undefined
     };
 
-    const sanitizedFileDataForFirestore = (newReportData.fileData && (newReportData.fileData.startsWith('blob:') || newReportData.fileData.length > 200000))
+    // Sanitize fileData for Firestore doc size safety (keep base64 if <= 750KB or if downloadUrl is empty)
+    const firestoreFileData = (downloadUrl && base64FileData.length > 500000)
       ? ''
-      : (newReportData.fileData || '');
+      : (base64FileData.length < 800000 ? base64FileData : '');
 
     try {
       const colRef = collection(db, 'medical_reports');
       const docRef = await addDoc(colRef, cleanForFirestore({
-        ...reportToSave,
+        fileName: reportToSave.fileName,
+        fileSize: reportToSave.fileSize,
+        fileType: reportToSave.fileType,
+        category: reportToSave.category,
+        subCategory: reportToSave.subCategory,
+        hospital: reportToSave.hospital,
         customHospital: reportToSave.customHospital || '',
         patientName: reportToSave.patientName || '',
         icNumber: reportToSave.icNumber || '',
+        reportDate: reportToSave.reportDate,
+        uploadDate: reportToSave.uploadDate,
+        hasCDROM: reportToSave.hasCDROM || false,
+        isClaimed: reportToSave.isClaimed || false,
         claimedDate: reportToSave.claimedDate || '',
         notes: reportToSave.notes || '',
+        userId: reportToSave.userId,
         downloadUrl: downloadUrl || '',
         storagePath: storagePath || '',
-        fileData: sanitizedFileDataForFirestore
+        fileData: firestoreFileData
       }));
 
       reportToSave.id = docRef.id;
       setReports((prev) => [reportToSave, ...prev.filter((r) => r.id !== reportToSave.id)]);
+      console.log('Successfully saved report to Firebase Firestore with ID:', docRef.id);
     } catch (err) {
-      console.error('Error adding report to Firestore, saving locally:', err);
+      console.error('Error adding report to Firestore:', err);
       setReports((prev) => [reportToSave, ...prev]);
     }
   };

@@ -21,10 +21,10 @@ export const UploadArea: React.FC<{ onSuccess?: () => void }> = ({ onSuccess }) 
   const { addReport } = useReports();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Form State
+  // Form State - Empty by default for fresh key-in
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [patientName, setPatientName] = useState<string>('Ahmad Rizal Bin Hassan');
-  const [icNumber, setIcNumber] = useState<string>('880315015432');
+  const [patientName, setPatientName] = useState<string>('');
+  const [icNumber, setIcNumber] = useState<string>('');
   const [fileName, setFileName] = useState<string>('');
   const [fileSize, setFileSize] = useState<number>(0);
   const [category, setCategory] = useState<ReportCategory>('Xray');
@@ -41,6 +41,23 @@ export const UploadArea: React.FC<{ onSuccess?: () => void }> = ({ onSuccess }) 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
+  // Helper to generate standardized file name for ANY hospital selection or patient details
+  const generateStandardizedFileName = (
+    pName: string,
+    pIc: string,
+    subCat: string,
+    hosp: string,
+    customHosp: string
+  ) => {
+    const cleanName = pName.trim().replace(/\s+/g, '_');
+    const cleanIc = pIc.trim();
+    const cleanSub = subCat.split(' ')[0].replace(/[^a-zA-Z0-9_]/g, '');
+    const activeHosp = hosp === 'OTHER' ? customHosp : hosp;
+    const cleanHosp = activeHosp.trim().replace(/\s+/g, '_');
+
+    return `${cleanName || 'Patient'}_${cleanIc || 'IC'}_${cleanSub || 'Report'}_${cleanHosp || 'Hospital'}.pdf`;
+  };
+
   // Category subcategory helper
   const selectedCatObj = MEDICAL_CATEGORIES.find((c) => c.id === category) || MEDICAL_CATEGORIES[0];
 
@@ -48,18 +65,43 @@ export const UploadArea: React.FC<{ onSuccess?: () => void }> = ({ onSuccess }) 
     setCategory(cat);
     const catObj = MEDICAL_CATEGORIES.find((c) => c.id === cat);
     if (catObj && catObj.subCategories.length > 0) {
-      setSubCategory(catObj.subCategories[0]);
+      const newSub = catObj.subCategories[0];
+      setSubCategory(newSub);
+      setFileName(generateStandardizedFileName(patientName, icNumber, newSub, hospital, customHospital));
     }
+  };
+
+  const handleSubCategoryChange = (sub: string) => {
+    setSubCategory(sub);
+    setFileName(generateStandardizedFileName(patientName, icNumber, sub, hospital, customHospital));
+  };
+
+  const handleHospitalChange = (hospShortName: string) => {
+    setHospital(hospShortName);
+    setFileName(generateStandardizedFileName(patientName, icNumber, subCategory, hospShortName, customHospital));
+  };
+
+  const handleCustomHospitalChange = (val: string) => {
+    setCustomHospital(val);
+    setFileName(generateStandardizedFileName(patientName, icNumber, subCategory, 'OTHER', val));
+  };
+
+  const handlePatientNameChange = (val: string) => {
+    setPatientName(val);
+    setFileName(generateStandardizedFileName(val, icNumber, subCategory, hospital, customHospital));
+  };
+
+  const handleIcNumberChange = (val: string) => {
+    setIcNumber(val);
+    setFileName(generateStandardizedFileName(patientName, val, subCategory, hospital, customHospital));
   };
 
   const processFile = (file: File) => {
     setSelectedFile(file);
     setFileSize(file.size);
     setErrorMessage(null);
-    // Auto generate standardized filename
-    const cleanName = patientName.trim().replace(/ /g, '_');
-    const cleanIc = icNumber.trim();
-    setFileName(`${cleanName || 'Patient'}_${cleanIc || 'IC'}_${subCategory.split(' ')[0]}_${hospital.replace(/ /g, '_')}.pdf`);
+    // Auto generate standardized filename for selected file and hospital
+    setFileName(generateStandardizedFileName(patientName, icNumber, subCategory, hospital, customHospital));
 
     // Create lightweight Object URL for fast PDF preview without memory bloat
     try {
@@ -128,13 +170,19 @@ export const UploadArea: React.FC<{ onSuccess?: () => void }> = ({ onSuccess }) 
 
       setSuccessMessage(`Successfully uploaded report to Firebase Storage: "${finalFileName}" (${formatBytes(fileSize)})`);
       
-      // Reset form
+      // Reset form - empty all boxes for fresh key-in
       setSelectedFile(null);
+      setPatientName('');
+      setIcNumber('');
       setFileName('');
       setFileSize(0);
+      setCustomHospital('');
       setHasCDROM(false);
       setIsClaimed(false);
       setFileDataUri('');
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
 
       if (onSuccess) {
         setTimeout(onSuccess, 1200);
@@ -253,13 +301,7 @@ export const UploadArea: React.FC<{ onSuccess?: () => void }> = ({ onSuccess }) 
               type="text"
               required
               value={patientName}
-              onChange={(e) => {
-                const newName = e.target.value;
-                setPatientName(newName);
-                const cleanName = newName.trim().replace(/ /g, '_');
-                const cleanIc = icNumber.trim();
-                setFileName(`${cleanName || 'Patient'}_${cleanIc || 'IC'}_${subCategory.split(' ')[0]}_${hospital.replace(/ /g, '_')}.pdf`);
-              }}
+              onChange={(e) => handlePatientNameChange(e.target.value)}
               placeholder="e.g. Ahmad Rizal Bin Hassan"
               className="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-600 text-slate-900 font-medium min-h-[44px]"
             />
@@ -273,13 +315,7 @@ export const UploadArea: React.FC<{ onSuccess?: () => void }> = ({ onSuccess }) 
               type="text"
               required
               value={icNumber}
-              onChange={(e) => {
-                const newIc = e.target.value;
-                setIcNumber(newIc);
-                const cleanName = patientName.trim().replace(/ /g, '_');
-                const cleanIc = newIc.trim();
-                setFileName(`${cleanName || 'Patient'}_${cleanIc || 'IC'}_${subCategory.split(' ')[0]}_${hospital.replace(/ /g, '_')}.pdf`);
-              }}
+              onChange={(e) => handleIcNumberChange(e.target.value)}
               placeholder="e.g. 880315015432"
               className="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-600 text-slate-900 font-mono font-medium min-h-[44px]"
             />
@@ -299,7 +335,7 @@ export const UploadArea: React.FC<{ onSuccess?: () => void }> = ({ onSuccess }) 
             placeholder="e.g. Ahmad_Rizal_880315015432_MRI_KPJ_DATO_ONN.pdf"
             className="w-full px-3.5 py-3 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-600 text-slate-900 font-mono font-medium bg-slate-50"
           />
-          <p className="text-[11px] text-slate-500 mt-1">Includes Patient Name and IC Number in compliance with medical archive standards.</p>
+          <p className="text-[11px] text-slate-500 mt-1">Includes Patient Name, IC Number, and Hospital name in compliance with medical archive standards.</p>
         </div>
 
         {/* Medical Category & Sub-Category */}
@@ -327,7 +363,7 @@ export const UploadArea: React.FC<{ onSuccess?: () => void }> = ({ onSuccess }) 
             </label>
             <select
               value={subCategory}
-              onChange={(e) => setSubCategory(e.target.value)}
+              onChange={(e) => handleSubCategoryChange(e.target.value)}
               className="w-full px-3 py-3 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-600 focus:border-blue-600 text-slate-900 font-medium bg-white min-h-[44px]"
             >
               {selectedCatObj.subCategories.map((sub) => (
@@ -351,7 +387,7 @@ export const UploadArea: React.FC<{ onSuccess?: () => void }> = ({ onSuccess }) 
                 <button
                   key={h.id}
                   type="button"
-                  onClick={() => setHospital(h.shortName)}
+                  onClick={() => handleHospitalChange(h.shortName)}
                   className={`
                     px-3 py-2 rounded-xl text-xs font-bold border transition-all min-h-[40px]
                     ${isSelected 
@@ -370,7 +406,7 @@ export const UploadArea: React.FC<{ onSuccess?: () => void }> = ({ onSuccess }) 
               type="text"
               required
               value={customHospital}
-              onChange={(e) => setCustomHospital(e.target.value)}
+              onChange={(e) => handleCustomHospitalChange(e.target.value)}
               placeholder="Enter custom hospital / clinic name"
               className="w-full mt-2 px-3.5 py-2.5 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-600 text-slate-900"
             />
