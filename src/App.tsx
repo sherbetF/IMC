@@ -60,7 +60,7 @@ const MainAppContent: React.FC = () => {
     );
   }
 
-  if (!currentUser) {
+  if (!currentUser || currentUser.isAnonymous) {
     return <LoginPage />;
   }
 

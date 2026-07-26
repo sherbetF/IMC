@@ -54,23 +54,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return;
     }
 
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user) {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user && !user.isAnonymous) {
         setIsDemoUser(false);
         setCurrentUser(user);
-        setLoading(false);
       } else {
-        // Automatically sign in anonymously so Firebase Storage and Firestore uploads work seamlessly
-        try {
-          const anonCred = await signInAnonymously(auth);
-          setCurrentUser(anonCred.user);
-        } catch (err) {
-          console.warn('Anonymous Firebase auth notice:', err);
-          setCurrentUser(null);
-        } finally {
-          setLoading(false);
-        }
+        setCurrentUser(user);
       }
+      setLoading(false);
     });
 
     return unsubscribe;
@@ -79,13 +70,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = async (email: string, pass: string) => {
     setIsDemoUser(false);
     localStorage.removeItem('outsource_db_demo_user');
-    await signInWithEmailAndPassword(auth, email, pass);
+    await signInWithEmailAndPassword(auth, email.trim(), pass);
   };
 
   const signup = async (email: string, pass: string) => {
     setIsDemoUser(false);
     localStorage.removeItem('outsource_db_demo_user');
-    await createUserWithEmailAndPassword(auth, email, pass);
+    await createUserWithEmailAndPassword(auth, email.trim(), pass);
   };
 
   const logout = async () => {
@@ -119,7 +110,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } as unknown as User);
   };
 
-  const isAdmin = currentUser?.uid === ADMIN_UID || isDemoUser;
+  const isAdmin = isDemoUser || !!(currentUser && !currentUser.isAnonymous) || currentUser?.uid === ADMIN_UID;
 
   return (
     <AuthContext.Provider value={{ currentUser, loading, login, signup, logout, demoLogin, isDemoUser, isAdmin }}>

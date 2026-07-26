@@ -92,8 +92,17 @@ export const LoginPage: React.FC = () => {
           </div>
 
           {error && (
-            <div className="mb-5 p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium">
-              {error}
+            <div className="mb-5 p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium space-y-2">
+              <p>{error}</p>
+              {!isSignUpMode && (
+                <button
+                  type="button"
+                  onClick={() => { setIsSignUpMode(true); setError(null); }}
+                  className="font-bold underline text-rose-800 hover:text-rose-900 block"
+                >
+                  Click here to register an account with {email || 'this email'}
+                </button>
+              )}
             </div>
           )}
 
