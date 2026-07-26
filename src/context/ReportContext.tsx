@@ -84,10 +84,27 @@ export const ReportProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         (snapshot) => {
           const docsData: MedicalReport[] = [];
           snapshot.forEach((docSnap) => {
-            docsData.push({
+            const data = docSnap.data();
+            const reportItem = {
               id: docSnap.id,
-              ...docSnap.data()
-            } as MedicalReport);
+              ...data
+            } as MedicalReport;
+            docsData.push(reportItem);
+
+            // If document has a storagePath in Storage but missing downloadUrl, resolve and update Firestore
+            if (data.storagePath && (!data.downloadUrl || !data.downloadUrl.startsWith('http'))) {
+              const fileRef = ref(storage, data.storagePath);
+              getDownloadURL(fileRef)
+                .then((resolvedUrl) => {
+                  if (resolvedUrl) {
+                    updateDoc(doc(db, 'medical_reports', docSnap.id), {
+                      downloadUrl: resolvedUrl,
+                      fileData: '' // ensure Base64 is cleared
+                    }).catch((e) => console.warn('Could not update resolved downloadUrl:', e));
+                  }
+                })
+                .catch((e) => console.warn('Could not resolve downloadUrl from storagePath:', data.storagePath, e));
+            }
           });
           
           if (docsData.length === 0) {
@@ -249,8 +266,8 @@ export const ReportProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   ) => {
     if (!currentUser) return;
 
-    let downloadUrl = newReportData.downloadUrl || '';
-    let storagePath = newReportData.storagePath || '';
+    let downloadUrl = '';
+    let storagePath = '';
 
     // Upload raw file to Firebase Storage
     if (rawFile) {
@@ -277,8 +294,9 @@ export const ReportProvider: React.FC<{ children: React.ReactNode }> = ({ childr
               hospital: newReportData.hospital || ''
             }
           });
+          // getDownloadURL() called after uploadBytes() and saved to downloadUrl
           downloadUrl = await getDownloadURL(uploadSnapshot.ref);
-          console.log('Firebase Storage file upload succeeded:', downloadUrl);
+          console.log('Firebase Storage file upload succeeded. Obtained downloadURL:', downloadUrl);
         } catch (primaryStorageErr) {
           console.warn('Primary Firebase Storage upload warning, attempting default storage bucket...', primaryStorageErr);
           try {
@@ -288,8 +306,9 @@ export const ReportProvider: React.FC<{ children: React.ReactNode }> = ({ childr
               contentType: rawFile.type || 'application/pdf',
               contentDisposition: 'inline'
             });
+            // getDownloadURL() called after uploadBytes() on backup ref and saved to downloadUrl
             downloadUrl = await getDownloadURL(uploadSnapshot.ref);
-            console.log('Fallback Firebase Storage upload succeeded:', downloadUrl);
+            console.log('Fallback Firebase Storage upload succeeded. Obtained downloadURL:', downloadUrl);
           } catch (fallbackErr) {
             console.error('Firebase Storage upload error:', fallbackErr);
           }
@@ -306,7 +325,7 @@ export const ReportProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       userId: currentUser.uid,
       downloadUrl: downloadUrl || undefined,
       storagePath: storagePath || undefined,
-      fileData: undefined
+      fileData: undefined // Ensuring we do NOT save PDF as base64 in local state
     };
 
     try {
@@ -328,9 +347,9 @@ export const ReportProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         claimedDate: reportToSave.claimedDate || '',
         notes: reportToSave.notes || '',
         userId: reportToSave.userId,
-        downloadUrl: downloadUrl || '',
+        downloadUrl: downloadUrl || '', // Save the resolved URL to Firestore
         storagePath: storagePath || '',
-        fileData: ''
+        fileData: '' // Explicitly ensuring fileData is saved as empty string (NOT Base64)
       }));
 
       reportToSave.id = docRef.id;

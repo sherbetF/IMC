@@ -12,6 +12,8 @@ import {
   Share2, 
   ExternalLink 
 } from 'lucide-react';
+import { ref, getDownloadURL } from 'firebase/storage';
+import { storage } from '../lib/firebase';
 import { MedicalReport } from '../types';
 import { MEDICAL_CATEGORIES, formatBytes } from '../data/presetData';
 import { generateSamplePdfDataUri } from '../data/sampleGenerator';
@@ -72,6 +74,31 @@ export const PdfPreviewModal: React.FC<PdfPreviewModalProps> = ({ report, onClos
         })
         .catch((err) => {
           console.warn('Direct blob fetch notice, using downloadUrl directly:', err);
+        });
+    } else if (report.storagePath) {
+      // Resolve download URL directly from Firebase Storage path
+      const fileRef = ref(storage, report.storagePath);
+      getDownloadURL(fileRef)
+        .then((url) => {
+          if (isMounted && url) {
+            setActiveSrc(url);
+            fetch(url)
+              .then((r) => r.blob())
+              .then((blob) => {
+                if (isMounted) {
+                  tempBlobUrl = URL.createObjectURL(blob);
+                  setCreatedBlobUrl(tempBlobUrl);
+                  setActiveSrc(tempBlobUrl);
+                }
+              })
+              .catch((e) => console.warn('Storage URL fetch fallback:', e));
+          }
+        })
+        .catch((err) => {
+          console.warn('Could not resolve download URL from storagePath:', err);
+          if (isMounted) {
+            setActiveSrc(generateSamplePdfDataUri(report.fileName, report.hospital, `${report.category} (${report.subCategory})`, report.reportDate));
+          }
         });
     } else if (report.fileData) {
       if (report.fileData.startsWith('data:application/pdf;base64,')) {
