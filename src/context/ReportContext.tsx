@@ -286,7 +286,7 @@ export const ReportProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         
         try {
           const storageRef = ref(storage, storagePath);
-          const uploadSnapshot = await uploadBytes(storageRef, rawFile, {
+          await uploadBytes(storageRef, rawFile, {
             contentType: rawFile.type || 'application/pdf',
             contentDisposition: 'inline',
             customMetadata: {
@@ -295,19 +295,19 @@ export const ReportProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             }
           });
           // getDownloadURL() called after uploadBytes() and saved to downloadUrl
-          downloadUrl = await getDownloadURL(uploadSnapshot.ref);
+          downloadUrl = await getDownloadURL(storageRef);
           console.log('Firebase Storage file upload succeeded. Obtained downloadURL:', downloadUrl);
         } catch (primaryStorageErr) {
           console.warn('Primary Firebase Storage upload warning, attempting default storage bucket...', primaryStorageErr);
           try {
             const fallbackStorage = getStorage(app);
             const fallbackRef = ref(fallbackStorage, storagePath);
-            const uploadSnapshot = await uploadBytes(fallbackRef, rawFile, {
+            await uploadBytes(fallbackRef, rawFile, {
               contentType: rawFile.type || 'application/pdf',
               contentDisposition: 'inline'
             });
             // getDownloadURL() called after uploadBytes() on backup ref and saved to downloadUrl
-            downloadUrl = await getDownloadURL(uploadSnapshot.ref);
+            downloadUrl = await getDownloadURL(fallbackRef);
             console.log('Fallback Firebase Storage upload succeeded. Obtained downloadURL:', downloadUrl);
           } catch (fallbackErr) {
             console.error('Firebase Storage upload error:', fallbackErr);
