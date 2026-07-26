@@ -10,12 +10,17 @@ export const LoginPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
 
+  const [errorCode, setErrorCode] = useState<string | null>(null);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setErrorCode(null);
     setLoading(true);
 
-    if (!email || !password) {
+    const cleanEmail = email.trim();
+
+    if (!cleanEmail || !password) {
       setError('Please enter your email and password.');
       setLoading(false);
       return;
@@ -23,25 +28,49 @@ export const LoginPage: React.FC = () => {
 
     try {
       if (isSignUpMode) {
-        await signup(email, password);
+        await signup(cleanEmail, password);
       } else {
-        await login(email, password);
+        await login(cleanEmail, password);
       }
     } catch (err: any) {
-      console.error('Auth error:', err);
-      let msg = err.message || 'Authentication failed.';
-      if (err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password') {
-        msg = 'Invalid credentials. Please check your email and password.';
-      } else if (err.code === 'auth/user-not-found') {
-        msg = 'No account found with this email. Please click "Create Account" to register or use Demo Mode.';
-      } else if (err.code === 'auth/email-already-in-use') {
-        msg = 'An account already exists with this email. Please switch to "Sign In".';
-      } else if (err.code === 'auth/weak-password') {
+      console.error('Firebase Auth Error:', err?.code, err?.message);
+      const code = err?.code || '';
+      setErrorCode(code);
+      let msg = err?.message || 'Authentication failed.';
+
+      if (code === 'auth/invalid-credential' || code === 'auth/wrong-password') {
+        msg = 'Invalid email or password. If you haven\'t created an account with this email yet, click "Register New Account" below.';
+      } else if (code === 'auth/user-not-found') {
+        msg = 'No account found with this email in Firebase. Would you like to register it now?';
+      } else if (code === 'auth/email-already-in-use') {
+        msg = 'An account with this email already exists. Click "Sign In" below to log in.';
+      } else if (code === 'auth/weak-password') {
         msg = 'Password should be at least 6 characters long.';
-      } else if (err.code === 'auth/invalid-email') {
+      } else if (code === 'auth/invalid-email') {
         msg = 'Please enter a valid email address.';
+      } else if (code === 'auth/too-many-requests') {
+        msg = 'Too many failed attempts. Access temporarily locked for security. You can use Instant Admin Demo Mode below.';
+      } else if (code === 'auth/operation-not-allowed') {
+        msg = 'Email/Password sign-in is not enabled in Firebase Console. Please use Instant Admin Demo Mode below.';
+      } else if (code === 'auth/network-request-failed') {
+        msg = 'Network connection failed. Please check your internet connection or try Instant Admin Demo Mode.';
       }
       setError(msg);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleQuickRegister = async () => {
+    setError(null);
+    setErrorCode(null);
+    setLoading(true);
+    try {
+      await signup(email.trim(), password);
+    } catch (err: any) {
+      console.error('Quick register error:', err);
+      setError(err?.message || 'Registration failed.');
+      setIsSignUpMode(true);
     } finally {
       setLoading(false);
     }
@@ -92,15 +121,36 @@ export const LoginPage: React.FC = () => {
           </div>
 
           {error && (
-            <div className="mb-5 p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium space-y-2">
-              <p>{error}</p>
-              {!isSignUpMode && (
+            <div className="mb-5 p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium space-y-2.5">
+              <p className="font-semibold">{error}</p>
+              
+              {!isSignUpMode && (errorCode === 'auth/invalid-credential' || errorCode === 'auth/wrong-password' || errorCode === 'auth/user-not-found') && (
+                <div className="pt-1 flex flex-col gap-1.5">
+                  <button
+                    type="button"
+                    onClick={handleQuickRegister}
+                    className="w-full text-left font-bold text-rose-900 bg-rose-100 hover:bg-rose-200 px-3 py-1.5 rounded-lg transition-all text-xs flex items-center justify-between"
+                  >
+                    <span>Register "{email}" as a new account</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setIsSignUpMode(true); setError(null); }}
+                    className="text-left font-medium text-rose-700 hover:underline text-[11px]"
+                  >
+                    Switch to Create Account form
+                  </button>
+                </div>
+              )}
+
+              {isSignUpMode && errorCode === 'auth/email-already-in-use' && (
                 <button
                   type="button"
-                  onClick={() => { setIsSignUpMode(true); setError(null); }}
-                  className="font-bold underline text-rose-800 hover:text-rose-900 block"
+                  onClick={() => { setIsSignUpMode(false); setError(null); }}
+                  className="font-bold underline text-rose-800 hover:text-rose-900 block pt-1"
                 >
-                  Click here to register an account with {email || 'this email'}
+                  Click here to switch to Sign In with "{email}"
                 </button>
               )}
             </div>
