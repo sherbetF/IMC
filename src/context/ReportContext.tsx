@@ -58,6 +58,11 @@ export const ReportProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [filters, setFilters] = useState<FilterState>(defaultFilters);
   const [previewingReport, setPreviewingReport] = useState<MedicalReport | null>(null);
 
+  // Clean object for Firestore (removes undefined properties)
+  const cleanForFirestore = <T,>(obj: T): T => {
+    return JSON.parse(JSON.stringify(obj));
+  };
+
   // Sync with Firestore or localStorage
   useEffect(() => {
     if (!currentUser) {
@@ -68,34 +73,12 @@ export const ReportProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     setLoading(true);
 
-    if (isDemoUser) {
-      // Demo user: load from localStorage or initialize with sample dataset
-      const localData = localStorage.getItem('outsource_db_reports_demo');
-      if (localData) {
-        try {
-          const parsed = JSON.parse(localData);
-          setReports(parsed);
-        } catch {
-          const samples = generateSampleReports(40, currentUser.uid);
-          setReports(samples);
-          localStorage.setItem('outsource_db_reports_demo', JSON.stringify(samples));
-        }
-      } else {
-        const samples = generateSampleReports(40, currentUser.uid);
-        setReports(samples);
-        localStorage.setItem('outsource_db_reports_demo', JSON.stringify(samples));
-      }
-      setLoading(false);
-      return;
-    }
-
     // Real Firebase Firestore subscription
     try {
       const colRef = collection(db, 'medical_reports');
-      const q = query(colRef, where('userId', '==', currentUser.uid));
 
       const unsubscribe = onSnapshot(
-        q,
+        colRef,
         (snapshot) => {
           const docsData: MedicalReport[] = [];
           snapshot.forEach((docSnap) => {
@@ -105,15 +88,33 @@ export const ReportProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             } as MedicalReport);
           });
           
-          // If Firestore is empty, load initial sample or keep empty
-          setReports(docsData);
+          if (docsData.length === 0) {
+            const storageKey = isDemoUser ? 'outsource_db_reports_demo' : `outsource_db_reports_${currentUser.uid}`;
+            const localData = localStorage.getItem(storageKey);
+            let initialSamples: MedicalReport[] = [];
+            if (localData) {
+              try { initialSamples = JSON.parse(localData); } catch (e) { console.error(e); }
+            }
+            if (!initialSamples || initialSamples.length === 0) {
+              initialSamples = generateSampleReports(30, currentUser.uid);
+            }
+            initialSamples.forEach(async (r) => {
+              try { await setDoc(doc(db, 'medical_reports', r.id), cleanForFirestore(r)); } catch (e) { console.error(e); }
+            });
+            setReports(initialSamples);
+          } else {
+            setReports(docsData);
+            const storageKey = isDemoUser ? 'outsource_db_reports_demo' : `outsource_db_reports_${currentUser.uid}`;
+            try { localStorage.setItem(storageKey, JSON.stringify(docsData)); } catch (e) { console.error(e); }
+          }
           setLoading(false);
           setError(null);
         },
         (err) => {
           console.warn('Firestore subscription warning, falling back to local storage sync:', err);
           setError('Operating in resilient offline mode.');
-          const localData = localStorage.getItem(`outsource_db_reports_${currentUser.uid}`);
+          const storageKey = isDemoUser ? 'outsource_db_reports_demo' : `outsource_db_reports_${currentUser.uid}`;
+          const localData = localStorage.getItem(storageKey);
           if (localData) {
             try {
               setReports(JSON.parse(localData));
@@ -123,7 +124,7 @@ export const ReportProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           } else {
             const initialSamples = generateSampleReports(30, currentUser.uid);
             setReports(initialSamples);
-            localStorage.setItem(`outsource_db_reports_${currentUser.uid}`, JSON.stringify(initialSamples));
+            localStorage.setItem(storageKey, JSON.stringify(initialSamples));
           }
           setLoading(false);
         }
@@ -274,34 +275,19 @@ export const ReportProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       storagePath: storagePath || undefined
     };
 
-    if (isDemoUser) {
-      setReports((prev) => [reportToSave, ...prev]);
-      return;
-    }
-
     try {
       const colRef = collection(db, 'medical_reports');
-      const docRef = await addDoc(colRef, {
-        fileName: reportToSave.fileName,
-        fileSize: reportToSave.fileSize,
-        fileType: reportToSave.fileType,
-        category: reportToSave.category,
-        subCategory: reportToSave.subCategory,
-        hospital: reportToSave.hospital,
+      const docRef = await addDoc(colRef, cleanForFirestore({
+        ...reportToSave,
         customHospital: reportToSave.customHospital || '',
         patientName: reportToSave.patientName || '',
         icNumber: reportToSave.icNumber || '',
-        reportDate: reportToSave.reportDate,
-        uploadDate: reportToSave.uploadDate,
-        hasCDROM: reportToSave.hasCDROM,
-        isClaimed: reportToSave.isClaimed || false,
         claimedDate: reportToSave.claimedDate || '',
         notes: reportToSave.notes || '',
-        userId: currentUser.uid,
         downloadUrl: downloadUrl || '',
         storagePath: storagePath || '',
         fileData: reportToSave.fileData || ''
-      });
+      }));
 
       reportToSave.id = docRef.id;
       setReports((prev) => [reportToSave, ...prev.filter((r) => r.id !== reportToSave.id)]);

@@ -219,6 +219,11 @@ export const TemporaryMedicalRecord: React.FC<TemporaryMedicalRecordProps> = ({ 
     console.error('Firestore Error details:', JSON.stringify(errInfo));
   };
 
+  // Helper to clean object for Firestore (removes undefined properties)
+  const cleanForFirestore = <T,>(obj: T): T => {
+    return JSON.parse(JSON.stringify(obj));
+  };
+
   // ---------------------------------------------------------
   // Fetch / Sync Patient Profiles and Clerking Notes
   // ---------------------------------------------------------
@@ -226,62 +231,72 @@ export const TemporaryMedicalRecord: React.FC<TemporaryMedicalRecordProps> = ({ 
     if (!currentUser) return;
     setLoading(true);
 
-    if (isDemoUser) {
-      const cachedPatients = localStorage.getItem('temp_med_patients_demo');
-      const cachedNotes = localStorage.getItem('temp_med_notes_demo');
-      
-      if (cachedPatients) {
-        try { setPatients(JSON.parse(cachedPatients)); } catch (e) { setPatients(PRESET_PATIENTS); }
-      } else {
-        setPatients(PRESET_PATIENTS);
-        localStorage.setItem('temp_med_patients_demo', JSON.stringify(PRESET_PATIENTS));
-      }
-
-      if (cachedNotes) {
-        try { setClerkingNotes(JSON.parse(cachedNotes)); } catch (e) { setClerkingNotes(PRESET_CLERKING_NOTES); }
-      } else {
-        setClerkingNotes(PRESET_CLERKING_NOTES);
-        localStorage.setItem('temp_med_notes_demo', JSON.stringify(PRESET_CLERKING_NOTES));
-      }
-
-      setLoading(false);
-      return;
-    }
-
     try {
       const patientsRef = collection(db, 'patient_profiles');
       const notesRef = collection(db, 'clerking_notes');
 
       const unsubscribePatients = onSnapshot(patientsRef, (snapshot) => {
         if (snapshot.empty) {
-          setPatients(PRESET_PATIENTS);
+          const cachedPatients = localStorage.getItem(isDemoUser ? 'temp_med_patients_demo' : `temp_med_patients_${currentUser.uid}`);
+          let initialList = PRESET_PATIENTS;
+          if (cachedPatients) {
+            try { initialList = JSON.parse(cachedPatients); } catch (e) { console.error(e); }
+          }
+          initialList.forEach(async (p) => {
+            try { await setDoc(doc(db, 'patient_profiles', p.id), cleanForFirestore(p)); } catch (e) { console.error(e); }
+          });
+          setPatients(initialList);
         } else {
           const list: PatientProfile[] = snapshot.docs.map(doc => ({
             id: doc.id,
             ...doc.data()
           } as PatientProfile));
           setPatients(list);
+          try {
+            localStorage.setItem(isDemoUser ? 'temp_med_patients_demo' : `temp_med_patients_${currentUser.uid}`, JSON.stringify(list));
+          } catch (e) { console.error(e); }
         }
         setLoading(false);
       }, (err) => {
-        handleFirestoreError(err, 'list', 'patient_profiles');
-        setPatients(PRESET_PATIENTS);
+        console.warn('Firestore patients snapshot error, using cached data:', err);
+        const cachedPatients = localStorage.getItem(isDemoUser ? 'temp_med_patients_demo' : `temp_med_patients_${currentUser.uid}`);
+        if (cachedPatients) {
+          try { setPatients(JSON.parse(cachedPatients)); } catch (e) { setPatients(PRESET_PATIENTS); }
+        } else {
+          setPatients(PRESET_PATIENTS);
+        }
         setLoading(false);
       });
 
       const unsubscribeNotes = onSnapshot(notesRef, (snapshot) => {
         if (snapshot.empty) {
-          setClerkingNotes(PRESET_CLERKING_NOTES);
+          const cachedNotes = localStorage.getItem(isDemoUser ? 'temp_med_notes_demo' : `temp_med_notes_${currentUser.uid}`);
+          let initialNotes = PRESET_CLERKING_NOTES;
+          if (cachedNotes) {
+            try { initialNotes = JSON.parse(cachedNotes); } catch (e) { console.error(e); }
+          }
+          initialNotes.forEach(async (n) => {
+            try { await setDoc(doc(db, 'clerking_notes', n.id), cleanForFirestore(n)); } catch (e) { console.error(e); }
+          });
+          setClerkingNotes(initialNotes);
         } else {
           const list: ClerkingNote[] = snapshot.docs.map(doc => ({
             id: doc.id,
             ...doc.data()
           } as ClerkingNote));
           setClerkingNotes(list);
+          try {
+            localStorage.setItem(isDemoUser ? 'temp_med_notes_demo' : `temp_med_notes_${currentUser.uid}`, JSON.stringify(list));
+          } catch (e) { console.error(e); }
         }
       }, (err) => {
-        handleFirestoreError(err, 'list', 'clerking_notes');
-        setClerkingNotes(PRESET_CLERKING_NOTES);
+        console.warn('Firestore notes snapshot error, using cached data:', err);
+        const cachedNotes = localStorage.getItem(isDemoUser ? 'temp_med_notes_demo' : `temp_med_notes_${currentUser.uid}`);
+        if (cachedNotes) {
+          try { setClerkingNotes(JSON.parse(cachedNotes)); } catch (e) { setClerkingNotes(PRESET_CLERKING_NOTES); }
+        } else {
+          setClerkingNotes(PRESET_CLERKING_NOTES);
+        }
       });
 
       return () => {
@@ -395,24 +410,23 @@ export const TemporaryMedicalRecord: React.FC<TemporaryMedicalRecordProps> = ({ 
       createdByEmail: userEmail
     };
 
-    if (isDemoUser) {
+    try {
+      const cleaned = cleanForFirestore(newPatient);
+      const docRef = await addDoc(collection(db, 'patient_profiles'), cleaned);
+      const fullPatient = { id: docRef.id, ...cleaned } as PatientProfile;
+      setSelectedPatient(fullPatient);
+      handleSubTabChange('directory');
+      resetRegForm();
+    } catch (err) {
+      console.error('Failed registering patient to Firestore:', err);
+      // Fallback local save
       const fullPatient = { id: uniqueId, ...newPatient } as PatientProfile;
       const nextPatients = [fullPatient, ...patients];
       setPatients(nextPatients);
       localStorage.setItem('temp_med_patients_demo', JSON.stringify(nextPatients));
-      
       setSelectedPatient(fullPatient);
       handleSubTabChange('directory');
       resetRegForm();
-    } else {
-      try {
-        await addDoc(collection(db, 'patient_profiles'), newPatient);
-        handleSubTabChange('directory');
-        resetRegForm();
-      } catch (err) {
-        handleFirestoreError(err, 'create', 'patient_profiles');
-        setRegError('Failed to register patient in database. Please check your network.');
-      }
     }
   };
 
@@ -429,7 +443,11 @@ export const TemporaryMedicalRecord: React.FC<TemporaryMedicalRecordProps> = ({ 
 
   // Actions: Transfer Zone
   const handleTransferZone = async (patientId: string, targetZone: PatientZone) => {
-    if (isDemoUser) {
+    try {
+      const pDoc = doc(db, 'patient_profiles', patientId);
+      await updateDoc(pDoc, { currentZone: targetZone });
+    } catch (err) {
+      console.error('Error updating patient zone:', err);
       const updatedList = patients.map(p => {
         if (p.id === patientId) {
           return { ...p, currentZone: targetZone };
@@ -437,14 +455,6 @@ export const TemporaryMedicalRecord: React.FC<TemporaryMedicalRecordProps> = ({ 
         return p;
       });
       setPatients(updatedList);
-      localStorage.setItem('temp_med_patients_demo', JSON.stringify(updatedList));
-    } else {
-      try {
-        const pDoc = doc(db, 'patient_profiles', patientId);
-        await updateDoc(pDoc, { currentZone: targetZone });
-      } catch (err) {
-        handleFirestoreError(err, 'update', `patient_profiles/${patientId}`);
-      }
     }
   };
 
@@ -472,22 +482,18 @@ export const TemporaryMedicalRecord: React.FC<TemporaryMedicalRecordProps> = ({ 
       amendments: []
     };
 
-    if (isDemoUser) {
+    try {
+      const cleaned = cleanForFirestore(newNote);
+      await addDoc(collection(db, 'clerking_notes'), cleaned);
+      setNoteProgress('');
+      setNoteBedNumber('');
+    } catch (err) {
+      console.error('Error saving clerking note to Firestore:', err);
       const fullNote = { id: noteId, ...newNote } as ClerkingNote;
       const nextNotes = [fullNote, ...clerkingNotes];
       setClerkingNotes(nextNotes);
-      localStorage.setItem('temp_med_notes_demo', JSON.stringify(nextNotes));
       setNoteProgress('');
       setNoteBedNumber('');
-    } else {
-      try {
-        await addDoc(collection(db, 'clerking_notes'), newNote);
-        setNoteProgress('');
-        setNoteBedNumber('');
-      } catch (err) {
-        handleFirestoreError(err, 'create', 'clerking_notes');
-        setNoteError('Error adding clerking note to Firestore.');
-      }
     }
   };
 

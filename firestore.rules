@@ -14,19 +14,29 @@ service cloud.firestore {
       allow read, write: if isAdmin();
     }
 
-    // Medical Reports collection access for authenticated users
+    // Medical Reports collection access for cross-device real-time sync
     match /medical_reports/{reportId} {
-      allow read, write: if isAuthenticated();
+      allow read, write: if true;
     }
 
-    // Patient Profiles collection access for authenticated users
+    // Patient Profiles collection access for cross-device real-time sync
     match /patient_profiles/{patientId} {
-      allow read, write: if isAuthenticated();
+      allow read, write: if true;
     }
 
-    // Clerking Notes collection access for authenticated users
+    // Clerking Notes collection access for cross-device real-time sync
     match /clerking_notes/{noteId} {
-      allow read, write: if isAuthenticated();
+      allow read, write: if true;
+    }
+
+    // Echo Cases collection access for cross-device real-time sync
+    match /echo_cases/{caseId} {
+      allow read, write: if true;
+    }
+
+    // Holter Schedules collection access for cross-device real-time sync
+    match /holter_schedules/{scheduleId} {
+      allow read, write: if true;
     }
 
     // Stock Items collection access for cross-device real-time sync

@@ -103,36 +103,20 @@ export const EchoCases: React.FC = () => {
   // Active case for modal/full-view
   const [viewingCase, setViewingCase] = useState<EchoCase | null>(null);
 
+  // Clean object for Firestore (removes undefined properties)
+  const cleanForFirestore = <T,>(obj: T): T => {
+    return JSON.parse(JSON.stringify(obj));
+  };
+
+  // Real-time listener for Firestore cases
   useEffect(() => {
     if (!currentUser) return;
-    
     setLoading(true);
 
-    if (isDemoUser) {
-      // Load preset + cached demo cases
-      const localData = localStorage.getItem('echo_cases_demo');
-      if (localData) {
-        try {
-          const parsed = JSON.parse(localData) as EchoCase[];
-          setCases(parsed.filter(c => !deletedIdsRef.current.includes(c.id)));
-        } catch {
-          setCases(PRESET_ECHO_CASES.filter(c => !deletedIdsRef.current.includes(c.id)));
-          localStorage.setItem('echo_cases_demo', JSON.stringify(PRESET_ECHO_CASES));
-        }
-      } else {
-        setCases(PRESET_ECHO_CASES.filter(c => !deletedIdsRef.current.includes(c.id)));
-        localStorage.setItem('echo_cases_demo', JSON.stringify(PRESET_ECHO_CASES));
-      }
-      setLoading(false);
-      return;
-    }
-
-    // Real-time listener for Firestore cases
     try {
       const colRef = collection(db, 'echo_cases');
-      const q = query(colRef, where('userId', 'in', [currentUser.uid, 'system']));
       
-      const unsubscribe = onSnapshot(q, (snapshot) => {
+      const unsubscribe = onSnapshot(colRef, (snapshot) => {
         let loadedCases: EchoCase[] = [];
         snapshot.forEach((docSnap) => {
           loadedCases.push({
@@ -141,20 +125,30 @@ export const EchoCases: React.FC = () => {
           } as EchoCase);
         });
 
-        // If firestore contains nothing, let's load presets
-        let combined: EchoCase[] = [];
         if (loadedCases.length === 0) {
-          combined = PRESET_ECHO_CASES;
+          const localData = localStorage.getItem(isDemoUser ? 'echo_cases_demo' : `echo_cases_${currentUser.uid}`);
+          let initialCases = PRESET_ECHO_CASES;
+          if (localData) {
+            try { initialCases = JSON.parse(localData); } catch (e) { console.error(e); }
+          }
+          initialCases.forEach(async (c) => {
+            try { await setDoc(doc(db, 'echo_cases', c.id), cleanForFirestore(c)); } catch (e) { console.error(e); }
+          });
+          setCases(initialCases.filter(c => !deletedIdsRef.current.includes(c.id)));
         } else {
-          // Merge presets and user items nicely
-          const userCases = loadedCases.filter(c => c.id !== 'preset-as' && c.id !== 'preset-mr' && c.id !== 'preset-hcm');
-          combined = [...userCases, ...PRESET_ECHO_CASES];
+          // Merge presets if missing
+          const presetIds = PRESET_ECHO_CASES.map(p => p.id);
+          const hasPresets = loadedCases.some(c => presetIds.includes(c.id));
+          const combined = hasPresets ? loadedCases : [...loadedCases, ...PRESET_ECHO_CASES];
+          setCases(combined.filter(c => !deletedIdsRef.current.includes(c.id)));
+          try {
+            localStorage.setItem(isDemoUser ? 'echo_cases_demo' : `echo_cases_${currentUser.uid}`, JSON.stringify(combined));
+          } catch (e) { console.error(e); }
         }
-        setCases(combined.filter(c => !deletedIdsRef.current.includes(c.id)));
         setLoading(false);
       }, (err) => {
         console.warn('Echo Cases firestore error, falling back to local storage cache:', err);
-        const localData = localStorage.getItem(`echo_cases_${currentUser.uid}`);
+        const localData = localStorage.getItem(isDemoUser ? 'echo_cases_demo' : `echo_cases_${currentUser.uid}`);
         if (localData) {
           try {
             const parsed = JSON.parse(localData) as EchoCase[];
@@ -240,16 +234,9 @@ export const EchoCases: React.FC = () => {
     };
 
     try {
-      if (isDemoUser) {
-        const localNewCase: EchoCase = {
-          ...caseData,
-          id: `case-demo-${Date.now()}`
-        };
-        setCases(prev => [localNewCase, ...prev]);
-      } else {
-        const colRef = collection(db, 'echo_cases');
-        await addDoc(colRef, caseData);
-      }
+      const colRef = collection(db, 'echo_cases');
+      const cleaned = cleanForFirestore(caseData);
+      await addDoc(colRef, cleaned);
 
       setSuccessMessage('Successfully saved echo case to cardiology database.');
       // Reset form fields
@@ -263,8 +250,22 @@ export const EchoCases: React.FC = () => {
       setMediaFile(null);
       setIsAdding(false);
     } catch (err) {
-      console.error('Error adding echo case:', err);
-      setErrorMessage('Failed to upload echo case. Please try again.');
+      console.error('Error adding echo case to Firestore, saving locally:', err);
+      const localNewCase: EchoCase = {
+        ...caseData,
+        id: `case-demo-${Date.now()}`
+      };
+      setCases(prev => [localNewCase, ...prev]);
+      setSuccessMessage('Saved echo case locally.');
+      setNewTitle('');
+      setNewPatientName('');
+      setNewMrn('');
+      setNewDoneBy('');
+      setNewOtherPathology('');
+      setNewDescription('');
+      setMediaPreviewUrl('');
+      setMediaFile(null);
+      setIsAdding(false);
     }
   };
 

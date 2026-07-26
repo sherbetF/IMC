@@ -275,10 +275,16 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
     return INITIAL_TRANSACTIONS;
   });
 
+  // Clean object for Firestore (strips undefined fields which cause Firestore setDoc errors)
+  const cleanForFirestore = <T,>(obj: T): T => {
+    return JSON.parse(JSON.stringify(obj));
+  };
+
   // Firestore Persistence Helpers for Cross-Device Synchronization
   const saveItemToFirestore = async (item: StockItem) => {
     try {
-      await setDoc(doc(db, 'stock_items', item.id), item);
+      const cleaned = cleanForFirestore(item);
+      await setDoc(doc(db, 'stock_items', item.id), cleaned);
     } catch (err) {
       console.error('Failed saving stock item to Firestore:', err);
     }
@@ -294,7 +300,8 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
 
   const saveTransactionToFirestore = async (trx: StockTransaction) => {
     try {
-      await setDoc(doc(db, 'stock_transactions', trx.id), trx);
+      const cleaned = cleanForFirestore(trx);
+      await setDoc(doc(db, 'stock_transactions', trx.id), cleaned);
     } catch (err) {
       console.error('Failed saving stock transaction to Firestore:', err);
     }
@@ -308,9 +315,19 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
     const unsubItems = onSnapshot(collection(db, 'stock_items'), (snapshot) => {
       if (!isMounted) return;
       if (snapshot.empty) {
-        // Seed default items if cloud database is empty
-        INITIAL_STOCK_ITEMS.forEach(item => saveItemToFirestore(item));
-        setItems(INITIAL_STOCK_ITEMS);
+        // Seed items (preserve any local items created by user)
+        const localSaved = (() => {
+          try {
+            const saved = localStorage.getItem('venepuncture_stock_items');
+            if (saved) return JSON.parse(saved) as StockItem[];
+          } catch (e) {
+            console.error('Error parsing local items:', e);
+          }
+          return INITIAL_STOCK_ITEMS;
+        })();
+
+        localSaved.forEach(item => saveItemToFirestore(item));
+        setItems(localSaved);
       } else {
         const docs: StockItem[] = [];
         snapshot.forEach(docSnap => {
@@ -331,8 +348,18 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
     const unsubTrx = onSnapshot(collection(db, 'stock_transactions'), (snapshot) => {
       if (!isMounted) return;
       if (snapshot.empty) {
-        INITIAL_TRANSACTIONS.forEach(trx => saveTransactionToFirestore(trx));
-        setTransactions(INITIAL_TRANSACTIONS);
+        const localSavedTrx = (() => {
+          try {
+            const saved = localStorage.getItem('venepuncture_stock_transactions');
+            if (saved) return JSON.parse(saved) as StockTransaction[];
+          } catch (e) {
+            console.error('Error parsing local transactions:', e);
+          }
+          return INITIAL_TRANSACTIONS;
+        })();
+
+        localSavedTrx.forEach(trx => saveTransactionToFirestore(trx));
+        setTransactions(localSavedTrx);
       } else {
         const docs: StockTransaction[] = [];
         snapshot.forEach(docSnap => {

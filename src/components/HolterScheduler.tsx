@@ -110,34 +110,21 @@ export const HolterScheduler: React.FC = () => {
     ? new Date(new Date(hookupDate).getTime() + durationDays * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
     : '';
 
+  // Clean object for Firestore (removes undefined properties)
+  const cleanForFirestore = <T,>(obj: T): T => {
+    return JSON.parse(JSON.stringify(obj));
+  };
+
   // Listen to firestore schedules
   useEffect(() => {
     if (!currentUser) return;
     
     setLoading(true);
 
-    if (isDemoUser) {
-      const localData = localStorage.getItem('holter_schedules_demo');
-      if (localData) {
-        try {
-          setSchedules(JSON.parse(localData));
-        } catch {
-          setSchedules(PRESET_HOLTER_SCHEDULES);
-          localStorage.setItem('holter_schedules_demo', JSON.stringify(PRESET_HOLTER_SCHEDULES));
-        }
-      } else {
-        setSchedules(PRESET_HOLTER_SCHEDULES);
-        localStorage.setItem('holter_schedules_demo', JSON.stringify(PRESET_HOLTER_SCHEDULES));
-      }
-      setLoading(false);
-      return;
-    }
-
     try {
       const colRef = collection(db, 'holter_schedules');
-      const q = query(colRef, where('userId', 'in', [currentUser.uid, 'system']));
 
-      const unsubscribe = onSnapshot(q, (snapshot) => {
+      const unsubscribe = onSnapshot(colRef, (snapshot) => {
         const docsData: HolterSchedule[] = [];
         snapshot.forEach((docSnap) => {
           docsData.push({
@@ -147,16 +134,29 @@ export const HolterScheduler: React.FC = () => {
         });
 
         if (docsData.length === 0) {
-          setSchedules(PRESET_HOLTER_SCHEDULES);
+          const localData = localStorage.getItem(isDemoUser ? 'holter_schedules_demo' : `holter_schedules_${currentUser.uid}`);
+          let initialSchedules = PRESET_HOLTER_SCHEDULES;
+          if (localData) {
+            try { initialSchedules = JSON.parse(localData); } catch (e) { console.error(e); }
+          }
+          initialSchedules.forEach(async (s) => {
+            try { await setDoc(doc(db, 'holter_schedules', s.id), cleanForFirestore(s)); } catch (e) { console.error(e); }
+          });
+          setSchedules(initialSchedules);
         } else {
-          // Merge user custom schedules and systems
-          const userItems = docsData.filter(d => d.id !== 'preset-h1' && d.id !== 'preset-h2' && d.id !== 'preset-h3' && d.id !== 'preset-h4');
-          setSchedules([...userItems, ...PRESET_HOLTER_SCHEDULES]);
+          // Merge preset schedules if needed
+          const presetIds = PRESET_HOLTER_SCHEDULES.map(p => p.id);
+          const hasPresets = docsData.some(d => presetIds.includes(d.id));
+          const combined = hasPresets ? docsData : [...docsData, ...PRESET_HOLTER_SCHEDULES];
+          setSchedules(combined);
+          try {
+            localStorage.setItem(isDemoUser ? 'holter_schedules_demo' : `holter_schedules_${currentUser.uid}`, JSON.stringify(combined));
+          } catch (e) { console.error(e); }
         }
         setLoading(false);
       }, (err) => {
         console.warn('Holter schedules firestore warning, loading offline cache:', err);
-        const localData = localStorage.getItem(`holter_schedules_${currentUser.uid}`);
+        const localData = localStorage.getItem(isDemoUser ? 'holter_schedules_demo' : `holter_schedules_${currentUser.uid}`);
         if (localData) {
           setSchedules(JSON.parse(localData));
         } else {
@@ -206,16 +206,9 @@ export const HolterScheduler: React.FC = () => {
     };
 
     try {
-      if (isDemoUser) {
-        const localNew: HolterSchedule = {
-          ...newSchedule,
-          id: `holter-demo-${Date.now()}`
-        };
-        setSchedules(prev => [localNew, ...prev]);
-      } else {
-        const colRef = collection(db, 'holter_schedules');
-        await addDoc(colRef, newSchedule);
-      }
+      const colRef = collection(db, 'holter_schedules');
+      const cleaned = cleanForFirestore(newSchedule);
+      await addDoc(colRef, cleaned);
 
       setSuccessMessage(`Successfully booked Holter scheduling session for ${patientName}`);
       setPatientName('');
@@ -223,8 +216,17 @@ export const HolterScheduler: React.FC = () => {
       setNotes('');
       setIsAdding(false);
     } catch (err) {
-      console.error(err);
-      setErrorMessage('Failed to schedule Holter. Try again.');
+      console.error('Error booking Holter schedule to Firestore, saving locally:', err);
+      const localNew: HolterSchedule = {
+        ...newSchedule,
+        id: `holter-demo-${Date.now()}`
+      };
+      setSchedules(prev => [localNew, ...prev]);
+      setSuccessMessage(`Booked Holter session locally for ${patientName}`);
+      setPatientName('');
+      setPatientPhone('');
+      setNotes('');
+      setIsAdding(false);
     }
   };
 
