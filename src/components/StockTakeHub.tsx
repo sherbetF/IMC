@@ -883,7 +883,7 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
               Stock Management System
             </h2>
             <p className="text-xs sm:text-sm text-indigo-200/80 max-w-2xl leading-relaxed">
-              Track blood tubes, butterfly needles, lancets, and consumables. Monitor indent suppliers, issue stock to wards, set custom alert thresholds, and audit stock log histories in RM.
+              Track blood tubes, butterfly needles, lancets, and consumables. Monitor indent suppliers, issue stock , set custom alert thresholds, and audit stock log histories
             </p>
           </div>
 
