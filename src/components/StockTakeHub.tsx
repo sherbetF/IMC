@@ -20,7 +20,6 @@ import {
   Trash2, 
   Edit3, 
   Layers, 
-  RefreshCw,
   Sparkles,
   ArrowUpRight,
   ArrowDownRight,
@@ -37,6 +36,8 @@ import {
 } from 'lucide-react';
 import { StockItem, StockTransaction, StockItemCategory, StockActionType, StockBatch } from '../types';
 import { useAuth } from '../context/AuthContext';
+import { db } from '../lib/firebase';
+import { collection, onSnapshot, doc, setDoc, deleteDoc } from 'firebase/firestore';
 
 // Default initial stock inventory with multi-expiry batch tracking
 const INITIAL_STOCK_ITEMS: StockItem[] = [
@@ -274,14 +275,87 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
     return INITIAL_TRANSACTIONS;
   });
 
-  // Save changes to localStorage
-  useEffect(() => {
-    localStorage.setItem('venepuncture_stock_items', JSON.stringify(items));
-  }, [items]);
+  // Firestore Persistence Helpers for Cross-Device Synchronization
+  const saveItemToFirestore = async (item: StockItem) => {
+    try {
+      await setDoc(doc(db, 'stock_items', item.id), item);
+    } catch (err) {
+      console.error('Failed saving stock item to Firestore:', err);
+    }
+  };
 
+  const deleteItemFromFirestore = async (itemId: string) => {
+    try {
+      await deleteDoc(doc(db, 'stock_items', itemId));
+    } catch (err) {
+      console.error('Failed deleting stock item from Firestore:', err);
+    }
+  };
+
+  const saveTransactionToFirestore = async (trx: StockTransaction) => {
+    try {
+      await setDoc(doc(db, 'stock_transactions', trx.id), trx);
+    } catch (err) {
+      console.error('Failed saving stock transaction to Firestore:', err);
+    }
+  };
+
+  // Real-Time Cross-Device Synchronization Listener via Firestore
   useEffect(() => {
-    localStorage.setItem('venepuncture_stock_transactions', JSON.stringify(transactions));
-  }, [transactions]);
+    let isMounted = true;
+
+    // Listen to stock_items collection
+    const unsubItems = onSnapshot(collection(db, 'stock_items'), (snapshot) => {
+      if (!isMounted) return;
+      if (snapshot.empty) {
+        // Seed default items if cloud database is empty
+        INITIAL_STOCK_ITEMS.forEach(item => saveItemToFirestore(item));
+        setItems(INITIAL_STOCK_ITEMS);
+      } else {
+        const docs: StockItem[] = [];
+        snapshot.forEach(docSnap => {
+          docs.push(docSnap.data() as StockItem);
+        });
+        setItems(docs);
+        try {
+          localStorage.setItem('venepuncture_stock_items', JSON.stringify(docs));
+        } catch (e) {
+          console.error('localStorage backup error:', e);
+        }
+      }
+    }, (error) => {
+      console.error('Firestore stock_items sync error:', error);
+    });
+
+    // Listen to stock_transactions collection
+    const unsubTrx = onSnapshot(collection(db, 'stock_transactions'), (snapshot) => {
+      if (!isMounted) return;
+      if (snapshot.empty) {
+        INITIAL_TRANSACTIONS.forEach(trx => saveTransactionToFirestore(trx));
+        setTransactions(INITIAL_TRANSACTIONS);
+      } else {
+        const docs: StockTransaction[] = [];
+        snapshot.forEach(docSnap => {
+          docs.push(docSnap.data() as StockTransaction);
+        });
+        docs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+        setTransactions(docs);
+        try {
+          localStorage.setItem('venepuncture_stock_transactions', JSON.stringify(docs));
+        } catch (e) {
+          console.error('localStorage backup error:', e);
+        }
+      }
+    }, (error) => {
+      console.error('Firestore stock_transactions sync error:', error);
+    });
+
+    return () => {
+      isMounted = false;
+      unsubItems();
+      unsubTrx();
+    };
+  }, []);
 
   // Active View State & Layout Mode
   const [viewMode, setViewMode] = useState<'inventory' | 'register' | 'logs' | 'summary'>('inventory');
@@ -536,6 +610,7 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
     };
 
     setItems(prev => [newItem, ...prev]);
+    saveItemToFirestore(newItem);
 
     // Initial Registration Log
     const initLog: StockTransaction = {
@@ -553,6 +628,7 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
     };
 
     setTransactions(prev => [initLog, ...prev]);
+    saveTransactionToFirestore(initLog);
 
     // Reset Form
     setNewItemName('');
@@ -568,16 +644,14 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
     e.preventDefault();
     if (!editingExpiryItem || !editExpiryValue) return;
 
-    setItems(prev => prev.map(item => {
-      if (item.id === editingExpiryItem.id) {
-        return {
-          ...item,
-          expiryDate: editExpiryValue,
-          updatedAt: new Date().toISOString()
-        };
-      }
-      return item;
-    }));
+    const updatedItem: StockItem = {
+      ...editingExpiryItem,
+      expiryDate: editExpiryValue,
+      updatedAt: new Date().toISOString()
+    };
+
+    setItems(prev => prev.map(item => item.id === editingExpiryItem.id ? updatedItem : item));
+    saveItemToFirestore(updatedItem);
 
     setEditingExpiryItem(null);
   };
@@ -669,6 +743,7 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
     const updatedItem = recalculateItemBatches(stockAdjustItem, updatedBatches);
 
     setItems(prev => prev.map(item => item.id === updatedItem.id ? updatedItem : item));
+    saveItemToFirestore(updatedItem);
 
     const newTrx: StockTransaction = {
       id: `trx-${Date.now()}`,
@@ -685,6 +760,7 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
     };
 
     setTransactions(prev => [newTrx, ...prev]);
+    saveTransactionToFirestore(newTrx);
 
     setStockAdjustItem(null);
     setAdjustNotes('');
@@ -723,6 +799,7 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
     const updatedItem = recalculateItemBatches(managingBatchesItem, updatedBatches);
 
     setItems(prev => prev.map(item => item.id === updatedItem.id ? updatedItem : item));
+    saveItemToFirestore(updatedItem);
     setManagingBatchesItem(updatedItem);
 
     const newTrx: StockTransaction = {
@@ -739,6 +816,7 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
       timestamp: new Date().toISOString()
     };
     setTransactions(prev => [newTrx, ...prev]);
+    saveTransactionToFirestore(newTrx);
 
     setNewBatchNumber('');
     setNewBatchQty(50);
@@ -761,6 +839,7 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
     const updatedItem = recalculateItemBatches(managingBatchesItem, updatedBatches);
 
     setItems(prev => prev.map(item => item.id === updatedItem.id ? updatedItem : item));
+    saveItemToFirestore(updatedItem);
     setManagingBatchesItem(updatedItem);
   };
 
@@ -769,16 +848,14 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
     e.preventDefault();
     if (!thresholdItem) return;
 
-    setItems(prev => prev.map(item => {
-      if (item.id === thresholdItem.id) {
-        return {
-          ...item,
-          warningThreshold: newThresholdValue,
-          updatedAt: new Date().toISOString()
-        };
-      }
-      return item;
-    }));
+    const updatedItem: StockItem = {
+      ...thresholdItem,
+      warningThreshold: newThresholdValue,
+      updatedAt: new Date().toISOString()
+    };
+
+    setItems(prev => prev.map(item => item.id === thresholdItem.id ? updatedItem : item));
+    saveItemToFirestore(updatedItem);
 
     setThresholdItem(null);
   };
@@ -786,17 +863,8 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
   // Delete Stock Item
   const handleDeleteItem = (id: string) => {
     setItems(prev => prev.filter(i => i.id !== id));
+    deleteItemFromFirestore(id);
     setDeletingItemId(null);
-  };
-
-  // Reset to Default Sample Data
-  const handleResetDefaults = () => {
-    if (confirm('Reset inventory to initial default sample data? Any custom items will be restored.')) {
-      setItems(INITIAL_STOCK_ITEMS);
-      setTransactions(INITIAL_TRANSACTIONS);
-      localStorage.removeItem('venepuncture_stock_items');
-      localStorage.removeItem('venepuncture_stock_transactions');
-    }
   };
 
   return (
@@ -835,14 +903,6 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
                   <span>Register New Item</span>
                 </>
               )}
-            </button>
-
-            <button
-              onClick={handleResetDefaults}
-              className="p-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition-all border border-white/10 min-h-[42px]"
-              title="Reset sample inventory data"
-            >
-              <RefreshCw className="w-4 h-4" />
             </button>
           </div>
         </div>

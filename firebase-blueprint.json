@@ -57,6 +57,47 @@
         "amendments": { "type": "array" }
       },
       "required": ["patientId", "progressNote", "createdBy", "status"]
+    },
+    "stock_items": {
+      "title": "Stock Items",
+      "description": "Inventory stock items tracked across devices in real time",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "category": { "type": "string" },
+        "currentStock": { "type": "number" },
+        "unit": { "type": "string" },
+        "pricePerUnit": { "type": "number" },
+        "locationStored": { "type": "string" },
+        "warningThreshold": { "type": "number" },
+        "expiryDate": { "type": "string" },
+        "batches": { "type": "array" },
+        "notes": { "type": "string" },
+        "pictureUrl": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "name", "category", "currentStock", "unit", "warningThreshold"]
+    },
+    "stock_transactions": {
+      "title": "Stock Transactions",
+      "description": "Inventory movement and adjustment audit logs",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "itemId": { "type": "string" },
+        "itemName": { "type": "string" },
+        "action": { "type": "string" },
+        "quantity": { "type": "number" },
+        "stockBefore": { "type": "number" },
+        "stockAfter": { "type": "number" },
+        "destinationOrSource": { "type": "string" },
+        "staffName": { "type": "string" },
+        "notes": { "type": "string" },
+        "timestamp": { "type": "string" }
+      },
+      "required": ["id", "itemId", "itemName", "action", "quantity", "staffName", "timestamp"]
     }
   },
   "firestore": {
@@ -67,6 +108,14 @@
     "/clerking_notes/{noteId}": {
       "schema": "clerking_notes",
       "description": "Clerking entries and progress notes for registered patients"
+    },
+    "/stock_items/{itemId}": {
+      "schema": "stock_items",
+      "description": "Shared real-time stock inventory items"
+    },
+    "/stock_transactions/{transactionId}": {
+      "schema": "stock_transactions",
+      "description": "Shared real-time stock movement audit logs"
     }
   }
 }

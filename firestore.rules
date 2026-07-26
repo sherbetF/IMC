@@ -28,5 +28,15 @@ service cloud.firestore {
     match /clerking_notes/{noteId} {
       allow read, write: if isAuthenticated();
     }
+
+    // Stock Items collection access for cross-device real-time sync
+    match /stock_items/{itemId} {
+      allow read, write: if true;
+    }
+
+    // Stock Transactions collection access for cross-device real-time sync
+    match /stock_transactions/{transactionId} {
+      allow read, write: if true;
+    }
   }
 }
