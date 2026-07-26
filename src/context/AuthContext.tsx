@@ -5,7 +5,9 @@ import {
   createUserWithEmailAndPassword, 
   signOut as firebaseSignOut, 
   onAuthStateChanged,
-  signInAnonymously
+  signInAnonymously,
+  setPersistence,
+  browserSessionPersistence
 } from 'firebase/auth';
 import { auth } from '../lib/firebase';
 
@@ -30,8 +32,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isDemoUser, setIsDemoUser] = useState<boolean>(false);
 
   useEffect(() => {
-    // Check if demo session exists in localStorage
-    const savedDemo = localStorage.getItem('outsource_db_demo_user');
+    // Set persistence to browserSessionPersistence to avoid persisting across different window sessions
+    setPersistence(auth, browserSessionPersistence).catch((err) => {
+      console.warn('Could not set persistence to session:', err);
+    });
+
+    // Check if demo session exists in sessionStorage
+    const savedDemo = sessionStorage.getItem('outsource_db_demo_user');
     if (savedDemo === 'true') {
       setIsDemoUser(true);
       setCurrentUser({
@@ -69,20 +76,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const login = async (email: string, pass: string) => {
     setIsDemoUser(false);
-    localStorage.removeItem('outsource_db_demo_user');
+    sessionStorage.removeItem('outsource_db_demo_user');
     await signInWithEmailAndPassword(auth, email.trim(), pass);
   };
 
   const signup = async (email: string, pass: string) => {
     setIsDemoUser(false);
-    localStorage.removeItem('outsource_db_demo_user');
+    sessionStorage.removeItem('outsource_db_demo_user');
     await createUserWithEmailAndPassword(auth, email.trim(), pass);
   };
 
   const logout = async () => {
     if (isDemoUser) {
       setIsDemoUser(false);
-      localStorage.removeItem('outsource_db_demo_user');
+      sessionStorage.removeItem('outsource_db_demo_user');
       setCurrentUser(null);
       return;
     }
@@ -91,7 +98,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const demoLogin = () => {
     setIsDemoUser(true);
-    localStorage.setItem('outsource_db_demo_user', 'true');
+    sessionStorage.setItem('outsource_db_demo_user', 'true');
     setCurrentUser({
       uid: 'demo-admin-uid',
       email: 'doctor@outsourcedb.med',

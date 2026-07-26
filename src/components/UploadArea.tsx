@@ -187,9 +187,9 @@ export const UploadArea: React.FC<{ onSuccess?: () => void }> = ({ onSuccess }) 
       if (onSuccess) {
         setTimeout(onSuccess, 1200);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error submitting report:', err);
-      setErrorMessage('Failed to submit report. Please try again.');
+      setErrorMessage(err?.message || 'Failed to submit report. Please try again.');
     } finally {
       setSubmitting(false);
     }

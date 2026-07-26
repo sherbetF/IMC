@@ -271,50 +271,45 @@ export const ReportProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     // Upload raw file to Firebase Storage
     if (rawFile) {
-      try {
-        if (!auth.currentUser) {
-          try {
-            await signInAnonymously(auth);
-          } catch (aErr) {
-            console.warn('Anonymous sign-in for Storage upload notice:', aErr);
-          }
-        }
+      if (!rawFile) {
+        throw new Error('No PDF file selected.');
+      }
 
-        const cleanFileName = (rawFile.name || 'medical_report.pdf').replace(/[^a-zA-Z0-9_.-]/g, '_');
-        const activeUid = auth.currentUser?.uid || currentUser.uid || 'public_user';
-        storagePath = `medical_reports/${activeUid}/${Date.now()}_${cleanFileName}`;
-        
+      if (!auth.currentUser) {
         try {
-          const storageRef = ref(storage, storagePath);
-          await uploadBytes(storageRef, rawFile, {
-            contentType: rawFile.type || 'application/pdf',
-            contentDisposition: 'inline',
-            customMetadata: {
-              patientName: newReportData.patientName || '',
-              hospital: newReportData.hospital || ''
-            }
-          });
-          // getDownloadURL() called after uploadBytes() and saved to downloadUrl
-          downloadUrl = await getDownloadURL(storageRef);
-          console.log('Firebase Storage file upload succeeded. Obtained downloadURL:', downloadUrl);
-        } catch (primaryStorageErr) {
-          console.warn('Primary Firebase Storage upload warning, attempting default storage bucket...', primaryStorageErr);
-          try {
-            const fallbackStorage = getStorage(app);
-            const fallbackRef = ref(fallbackStorage, storagePath);
-            await uploadBytes(fallbackRef, rawFile, {
-              contentType: rawFile.type || 'application/pdf',
-              contentDisposition: 'inline'
-            });
-            // getDownloadURL() called after uploadBytes() on backup ref and saved to downloadUrl
-            downloadUrl = await getDownloadURL(fallbackRef);
-            console.log('Fallback Firebase Storage upload succeeded. Obtained downloadURL:', downloadUrl);
-          } catch (fallbackErr) {
-            console.error('Firebase Storage upload error:', fallbackErr);
-          }
+          await signInAnonymously(auth);
+        } catch (aErr) {
+          console.warn('Anonymous sign-in for Storage upload notice:', aErr);
         }
-      } catch (storageErr) {
-        console.error('Firebase Storage upload exception:', storageErr);
+      }
+
+      const cleanFileName = rawFile.name.replace(/[^a-zA-Z0-9_.-]/g, '_');
+      const activeUid = auth.currentUser?.uid || currentUser.uid || 'public_user';
+      storagePath = `medical_reports/${activeUid}/${Date.now()}_${cleanFileName}`;
+
+      try {
+        const storageRef = ref(storage, storagePath);
+        await uploadBytes(storageRef, rawFile, {
+          contentType: 'application/pdf',
+        });
+        // getDownloadURL() called after uploadBytes() and saved to downloadUrl
+        downloadUrl = await getDownloadURL(storageRef);
+        console.log('PDF uploaded successfully:', downloadUrl);
+      } catch (primaryStorageErr) {
+        console.warn('Primary Firebase Storage upload warning, attempting default storage bucket...', primaryStorageErr);
+        try {
+          const fallbackStorage = getStorage(app);
+          const fallbackRef = ref(fallbackStorage, storagePath);
+          await uploadBytes(fallbackRef, rawFile, {
+            contentType: 'application/pdf',
+          });
+          // getDownloadURL() called after uploadBytes() on backup ref and saved to downloadUrl
+          downloadUrl = await getDownloadURL(fallbackRef);
+          console.log('Fallback PDF uploaded successfully:', downloadUrl);
+        } catch (fallbackErr) {
+          console.error('Firebase Storage upload error:', fallbackErr);
+          throw new Error('PDF upload to Firebase Storage failed.');
+        }
       }
     }
 
