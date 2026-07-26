@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   X, 
   Download, 
@@ -21,23 +21,89 @@ interface PdfPreviewModalProps {
   onClose: () => void;
 }
 
+// Convert base64 data to Blob for fast native PDF rendering without data URI iframe blocks
+function base64ToBlob(base64Data: string, contentType = 'application/pdf'): Blob {
+  const base64Clean = base64Data.includes(',') ? base64Data.split(',')[1] : base64Data;
+  const byteCharacters = atob(base64Clean);
+  const byteArrays: Uint8Array[] = [];
+
+  for (let offset = 0; offset < byteCharacters.length; offset += 1024) {
+    const slice = byteCharacters.slice(offset, offset + 1024);
+    const byteNumbers = new Array(slice.length);
+    for (let i = 0; i < slice.length; i++) {
+      byteNumbers[i] = slice.charCodeAt(i);
+    }
+    byteArrays.push(new Uint8Array(byteNumbers));
+  }
+
+  return new Blob(byteArrays, { type: contentType });
+}
+
 export const PdfPreviewModal: React.FC<PdfPreviewModalProps> = ({ report, onClose }) => {
+  const [activeSrc, setActiveSrc] = useState<string>('');
+  const [createdBlobUrl, setCreatedBlobUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!report) {
+      setActiveSrc('');
+      return;
+    }
+
+    let urlToUse = '';
+    let tempBlobUrl: string | null = null;
+
+    if (report.downloadUrl && report.downloadUrl.startsWith('http')) {
+      urlToUse = report.downloadUrl;
+    } else if (report.fileData) {
+      if (report.fileData.startsWith('data:application/pdf;base64,')) {
+        try {
+          const blob = base64ToBlob(report.fileData, 'application/pdf');
+          tempBlobUrl = URL.createObjectURL(blob);
+          urlToUse = tempBlobUrl;
+        } catch {
+          urlToUse = report.fileData;
+        }
+      } else if (report.fileData.startsWith('data:image/') || report.fileData.startsWith('blob:')) {
+        urlToUse = report.fileData;
+      } else if (report.fileData.length > 50) {
+        // Raw base64 string
+        try {
+          const blob = base64ToBlob(report.fileData, 'application/pdf');
+          tempBlobUrl = URL.createObjectURL(blob);
+          urlToUse = tempBlobUrl;
+        } catch {
+          urlToUse = report.fileData;
+        }
+      }
+    }
+
+    // Fallback to sample generator if no URL resolved
+    if (!urlToUse) {
+      urlToUse = generateSamplePdfDataUri(
+        report.fileName,
+        report.hospital,
+        `${report.category} (${report.subCategory})`,
+        report.reportDate
+      );
+    }
+
+    setActiveSrc(urlToUse);
+    setCreatedBlobUrl(tempBlobUrl);
+
+    return () => {
+      if (tempBlobUrl) {
+        URL.revokeObjectURL(tempBlobUrl);
+      }
+    };
+  }, [report]);
+
   if (!report) return null;
 
   const categoryInfo = MEDICAL_CATEGORIES.find((c) => c.id === report.category);
 
-  // Use Firebase Storage downloadUrl if present, or fileData, or sample fallback
-  const pdfSrc = report.downloadUrl || report.fileData || generateSamplePdfDataUri(
-    report.fileName,
-    report.hospital,
-    `${report.category} (${report.subCategory})`,
-    report.reportDate
-  );
-
-  const isPdf = report.fileName.toLowerCase().endsWith('.pdf') || 
-                (report.fileType && report.fileType === 'application/pdf') || 
-                pdfSrc.startsWith('data:application/pdf') ||
-                pdfSrc.includes('.pdf');
+  // Check if current source is an SVG or Image data URI versus PDF
+  const isImageSrc = activeSrc.startsWith('data:image/');
+  const isPdf = !isImageSrc;
 
   const handleDownload = () => {
     if (report.downloadUrl) {
@@ -45,11 +111,17 @@ export const PdfPreviewModal: React.FC<PdfPreviewModalProps> = ({ report, onClos
       return;
     }
     const link = document.createElement('a');
-    link.href = pdfSrc;
+    link.href = activeSrc;
     link.download = report.fileName.endsWith('.pdf') ? report.fileName : `${report.fileName}.pdf`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  const handleOpenInNewTab = () => {
+    if (activeSrc) {
+      window.open(activeSrc, '_blank');
+    }
   };
 
   return (
@@ -74,6 +146,15 @@ export const PdfPreviewModal: React.FC<PdfPreviewModalProps> = ({ report, onClos
 
           <div className="flex items-center space-x-2 shrink-0">
             <button
+              onClick={handleOpenInNewTab}
+              className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition-all flex items-center gap-1.5 min-h-[38px]"
+              title="Open in new tab"
+            >
+              <ExternalLink className="w-4 h-4" />
+              <span className="hidden sm:inline">Open Tab</span>
+            </button>
+
+            <button
               onClick={handleDownload}
               className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-all flex items-center gap-1.5 min-h-[38px]"
             >
@@ -95,39 +176,52 @@ export const PdfPreviewModal: React.FC<PdfPreviewModalProps> = ({ report, onClos
         <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
           
           {/* Left Preview Stage */}
-          <div className="flex-1 bg-slate-100 p-4 overflow-auto flex items-center justify-center min-h-[350px] md:min-h-[500px]">
+          <div className="flex-1 bg-slate-100 p-4 overflow-auto flex items-center justify-center min-h-[380px] md:min-h-[500px]">
             {isPdf ? (
               <div className="w-full h-full min-h-[480px] flex flex-col space-y-3 justify-between">
-                <iframe
-                  src={pdfSrc}
-                  title="PDF Preview"
-                  className="w-full flex-1 h-[420px] rounded-lg border border-slate-300 shadow-xs bg-white"
-                />
-                <div className="flex flex-col items-center justify-center text-center p-3 bg-slate-50 border border-slate-200 rounded-xl">
-                  <a
-                    href={pdfSrc}
-                    target="_blank"
-                    rel="noreferrer noopener"
-                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-950 hover:bg-slate-800 text-white text-xs font-bold transition-all shadow-xs min-h-[38px]"
+                <object
+                  data={activeSrc}
+                  type="application/pdf"
+                  className="w-full flex-1 min-h-[420px] rounded-xl border border-slate-300 shadow-xs bg-white"
+                >
+                  <div className="flex flex-col items-center justify-center h-full p-6 text-center bg-white rounded-xl border border-slate-200">
+                    <FileText className="w-12 h-12 text-indigo-500 mb-3" />
+                    <h4 className="text-sm font-bold text-slate-900 mb-1">{report.fileName}</h4>
+                    <p className="text-xs text-slate-500 max-w-md mb-4">
+                      This PDF medical report is ready to view. Click below to view the full report in a high-resolution browser tab.
+                    </p>
+                    <button
+                      onClick={handleOpenInNewTab}
+                      className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-all shadow-xs min-h-[40px]"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                      <span>View PDF in Full Screen Tab</span>
+                    </button>
+                  </div>
+                </object>
+
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-2 p-3 bg-white border border-slate-200 rounded-xl">
+                  <div className="flex items-center gap-2 text-xs text-slate-600">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                    <span>Verified PDF Document ({formatBytes(report.fileSize)})</span>
+                  </div>
+                  <button
+                    onClick={handleOpenInNewTab}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition-all min-h-[36px]"
                   >
-                    <ExternalLink className="w-4 h-4" />
-                    <span>Open PDF in New Browser Tab</span>
-                  </a>
-                  <p className="text-[10px] text-slate-400 mt-1">If the PDF fails to render inside the frame, click above to read directly.</p>
+                    <ExternalLink className="w-3.5 h-3.5" />
+                    <span>Open Full Page View</span>
+                  </button>
                 </div>
               </div>
-            ) : pdfSrc.startsWith('data:image/svg+xml') ? (
-              <img 
-                src={pdfSrc} 
-                alt="Medical Report Preview" 
-                className="max-w-full max-h-[70vh] object-contain shadow-lg rounded-lg border border-slate-300"
-              />
             ) : (
-              <img 
-                src={pdfSrc} 
-                alt="Medical Report Document" 
-                className="max-w-full max-h-[70vh] object-contain shadow-lg rounded-lg border border-slate-300"
-              />
+              <div className="w-full h-full flex items-center justify-center p-2">
+                <img 
+                  src={activeSrc} 
+                  alt={report.fileName} 
+                  className="max-w-full max-h-[72vh] object-contain shadow-lg rounded-xl border border-slate-300 bg-white"
+                />
+              </div>
             )}
           </div>
 
@@ -149,6 +243,14 @@ export const PdfPreviewModal: React.FC<PdfPreviewModalProps> = ({ report, onClos
               <div>
                 <span className="text-slate-400 block text-[10px] uppercase font-bold">Facility / Hospital</span>
                 <span className="text-sm font-bold text-slate-900 block mt-0.5">{report.hospital}</span>
+              </div>
+
+              <div>
+                <span className="text-slate-400 block text-[10px] uppercase font-bold">Patient Details</span>
+                <span className="text-xs font-bold text-slate-800 block mt-0.5">{report.patientName || 'N/A'}</span>
+                {report.icNumber && (
+                  <span className="text-[11px] text-slate-500 font-mono block">{report.icNumber}</span>
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-2 pt-1">
@@ -189,20 +291,11 @@ export const PdfPreviewModal: React.FC<PdfPreviewModalProps> = ({ report, onClos
               </button>
 
               <button
-                onClick={() => {
-                  if (navigator.share) {
-                    navigator.share({
-                      title: report.fileName,
-                      text: `Medical report from ${report.hospital}`
-                    }).catch(() => {});
-                  } else {
-                    handleDownload();
-                  }
-                }}
-                className="w-full py-2 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs flex items-center justify-center gap-2 transition-all min-h-[40px]"
+                onClick={handleOpenInNewTab}
+                className="w-full py-2 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold text-xs flex items-center justify-center gap-2 transition-all min-h-[40px]"
               >
-                <Share2 className="w-4 h-4" />
-                <span>Share Document</span>
+                <ExternalLink className="w-4 h-4" />
+                <span>Open in New Tab</span>
               </button>
             </div>
 
@@ -213,3 +306,4 @@ export const PdfPreviewModal: React.FC<PdfPreviewModalProps> = ({ report, onClos
     </div>
   );
 };
+
