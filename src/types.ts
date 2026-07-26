@@ -165,6 +165,8 @@ export interface StockItem {
   type: StockItemCategory;
   indentFrom: string; // Indent supplier e.g. "HSA Store Utama", "KPJ Central Store"
   currentStock: number;
+  imcStock?: number; // Stock quantity in IMC Store
+  ppdStock?: number; // Stock quantity in PPD Store
   unit: string; // e.g. "pcs", "boxes", "packs", "bottles"
   pictureUrl?: string; // base64 or URL
   pricePerUnit: number; // Price in RM
@@ -177,7 +179,7 @@ export interface StockItem {
   updatedAt: string;
 }
 
-export type StockActionType = 'ADD' | 'REMOVE';
+export type StockActionType = 'ADD' | 'REMOVE' | 'TRANSFER';
 
 export interface StockTransaction {
   id: string;

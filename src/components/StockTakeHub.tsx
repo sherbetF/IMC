@@ -32,7 +32,8 @@ import {
   List,
   Calendar,
   Clock,
-  AlertCircle
+  AlertCircle,
+  ArrowLeftRight
 } from 'lucide-react';
 import { StockItem, StockTransaction, StockItemCategory, StockActionType, StockBatch } from '../types';
 import { useAuth } from '../context/AuthContext';
@@ -47,6 +48,8 @@ const INITIAL_STOCK_ITEMS: StockItem[] = [
     type: 'Blood Collection Tubes',
     indentFrom: 'HSA Central Store Utama',
     currentStock: 450,
+    imcStock: 400,
+    ppdStock: 50,
     unit: 'pcs',
     pricePerUnit: 0.85,
     locationStored: 'Cabinet A - Shelf 1',
@@ -67,6 +70,8 @@ const INITIAL_STOCK_ITEMS: StockItem[] = [
     type: 'Blood Collection Tubes',
     indentFrom: 'HSA Central Store Utama',
     currentStock: 320,
+    imcStock: 300,
+    ppdStock: 20,
     unit: 'pcs',
     pricePerUnit: 0.95,
     locationStored: 'Cabinet A - Shelf 2',
@@ -87,6 +92,8 @@ const INITIAL_STOCK_ITEMS: StockItem[] = [
     type: 'Blood Collection Tubes',
     indentFrom: 'Medivest Central Store',
     currentStock: 35, // LOW STOCK
+    imcStock: 30,
+    ppdStock: 5,
     unit: 'pcs',
     pricePerUnit: 1.10,
     locationStored: 'Cabinet A - Shelf 3',
@@ -106,6 +113,8 @@ const INITIAL_STOCK_ITEMS: StockItem[] = [
     type: 'Needles & Butterflies',
     indentFrom: 'KPJ Central Store',
     currentStock: 180,
+    imcStock: 150,
+    ppdStock: 30,
     unit: 'pcs',
     pricePerUnit: 2.20,
     locationStored: 'Venepuncture Trolley 1 - Drawer 1',
@@ -126,6 +135,8 @@ const INITIAL_STOCK_ITEMS: StockItem[] = [
     type: 'Equipment & Devices',
     indentFrom: 'HSA Central Store Utama',
     currentStock: 200,
+    imcStock: 180,
+    ppdStock: 20,
     unit: 'pcs',
     pricePerUnit: 0.45,
     locationStored: 'Cabinet B - Shelf 1',
@@ -145,6 +156,8 @@ const INITIAL_STOCK_ITEMS: StockItem[] = [
     type: 'Swabs & Disinfectants',
     indentFrom: 'Store Utama IMC',
     currentStock: 8, // LOW STOCK
+    imcStock: 5,
+    ppdStock: 3,
     unit: 'boxes (100s)',
     pricePerUnit: 12.50,
     locationStored: 'Venepuncture Trolley 2',
@@ -164,6 +177,8 @@ const INITIAL_STOCK_ITEMS: StockItem[] = [
     type: 'Dressings & Tourniquets',
     indentFrom: 'Store Utama IMC',
     currentStock: 15,
+    imcStock: 10,
+    ppdStock: 5,
     unit: 'pcs',
     pricePerUnit: 8.00,
     locationStored: 'Drawer 2 - Main Desk',
@@ -412,10 +427,12 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
   const [selectedIndent, setSelectedIndent] = useState<string>('ALL');
   const [showLowStockOnly, setShowLowStockOnly] = useState<boolean>(false);
   const [showExpiringOnly, setShowExpiringOnly] = useState<boolean>(false);
+  const [selectedStoreFilter, setSelectedStoreFilter] = useState<'ALL' | 'IMC' | 'PPD'>('ALL');
 
   // Modals State
   const [stockAdjustItem, setStockAdjustItem] = useState<StockItem | null>(null);
   const [adjustAction, setAdjustAction] = useState<StockActionType>('REMOVE');
+  const [adjustStore, setAdjustStore] = useState<'IMC' | 'PPD'>('IMC');
   const [adjustQuantity, setAdjustQuantity] = useState<number | ''>(10);
   const [adjustDestination, setAdjustDestination] = useState<string>('');
   const [adjustStaffName, setAdjustStaffName] = useState<string>(currentUser?.email?.split('@')[0] || 'MA Shafiq');
@@ -486,7 +503,8 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
   const [newItemName, setNewItemName] = useState<string>('');
   const [newItemCategory, setNewItemCategory] = useState<StockItemCategory>('Blood Collection Tubes');
   const [newItemIndentFrom, setNewItemIndentFrom] = useState<string>('HSA Store Utama');
-  const [newItemStock, setNewItemStock] = useState<number | ''>(100);
+  const [newItemImcStock, setNewItemImcStock] = useState<number | ''>(100);
+  const [newItemPpdStock, setNewItemPpdStock] = useState<number | ''>(0);
   const [newItemUnit, setNewItemUnit] = useState<string>('pcs');
   const [newItemPrice, setNewItemPrice] = useState<number | ''>(1.50);
   const [newItemLocation, setNewItemLocation] = useState<string>('Cabinet A - Shelf 1');
@@ -567,13 +585,25 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
                           item.indentFrom.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCategory = selectedCategory === 'ALL' || item.type === selectedCategory;
     const matchesIndent = selectedIndent === 'ALL' || item.indentFrom === selectedIndent;
-    const matchesLowStock = !showLowStockOnly || item.currentStock <= item.warningThreshold;
+    
+    // Calculate store-specific stock level for evaluation
+    const activeStock = selectedStoreFilter === 'ALL'
+      ? item.currentStock
+      : selectedStoreFilter === 'IMC'
+        ? (item.imcStock ?? item.currentStock)
+        : (item.ppdStock ?? 0);
+
+    const matchesLowStock = !showLowStockOnly || activeStock <= item.warningThreshold;
     const matchesExpiring = !showExpiringOnly || (() => {
       const info = getExpiryInfo(item.expiryDate);
       return info.status === 'EXPIRED' || info.status === 'EXPIRING_SOON';
     })();
 
-    return matchesSearch && matchesCategory && matchesIndent && matchesLowStock && matchesExpiring;
+    const matchesStore = selectedStoreFilter === 'ALL' || 
+                         (selectedStoreFilter === 'IMC' && (item.imcStock ?? item.currentStock) > 0) ||
+                         (selectedStoreFilter === 'PPD' && (item.ppdStock ?? 0) > 0);
+
+    return matchesSearch && matchesCategory && matchesIndent && matchesLowStock && matchesExpiring && matchesStore;
   });
 
   // Handle Image File Upload
@@ -605,7 +635,9 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
       return;
     }
 
-    const stockQty = typeof newItemStock === 'number' ? newItemStock : 0;
+    const imcQty = typeof newItemImcStock === 'number' ? newItemImcStock : 0;
+    const ppdQty = typeof newItemPpdStock === 'number' ? newItemPpdStock : 0;
+    const stockQty = imcQty + ppdQty;
     const price = typeof newItemPrice === 'number' ? newItemPrice : 0;
     const threshold = typeof newItemThreshold === 'number' ? newItemThreshold : 20;
 
@@ -624,6 +656,8 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
       type: newItemCategory,
       indentFrom: newItemIndentFrom.trim() || 'Store Utama IMC',
       currentStock: stockQty,
+      imcStock: imcQty,
+      ppdStock: ppdQty,
       unit: newItemUnit.trim() || 'pcs',
       pricePerUnit: price,
       locationStored: newItemLocation.trim() || 'Venepuncture Desk',
@@ -648,9 +682,9 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
       quantity: stockQty,
       stockBefore: 0,
       stockAfter: stockQty,
-      destinationOrSource: `Initial Registration Indent from ${newItem.indentFrom} (Exp: ${newItemExpiryDate})`,
+      destinationOrSource: `Initial registration (IMC Store: ${imcQty}, PPD Store: ${ppdQty})`,
       staffName: currentUser?.email?.split('@')[0] || 'MA Shafiq',
-      notes: `New item registered into Venepuncture Hub inventory with Expiry Date: ${newItemExpiryDate}`,
+      notes: `New item registered with IMC: ${imcQty}, PPD: ${ppdQty}, Expiry: ${newItemExpiryDate}`,
       timestamp: new Date().toISOString(),
     };
 
@@ -659,7 +693,8 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
 
     // Reset Form
     setNewItemName('');
-    setNewItemStock(100);
+    setNewItemImcStock(100);
+    setNewItemPpdStock(0);
     setNewItemPrice(1.50);
     setNewItemNotes('');
     setNewItemImage('');
@@ -694,7 +729,7 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
       return;
     }
 
-    if (!adjustDestination.trim()) {
+    if (!adjustDestination.trim() && adjustAction !== 'TRANSFER') {
       alert(adjustAction === 'REMOVE' 
         ? 'Please specify where the stock goes or who it was sent to.' 
         : 'Please specify the indent origin / supplier batch info.'
@@ -708,14 +743,35 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
     }
 
     const currentQty = stockAdjustItem.currentStock;
+    const currentImcStock = typeof stockAdjustItem.imcStock === 'number' ? stockAdjustItem.imcStock : stockAdjustItem.currentStock;
+    const currentPpdStock = typeof stockAdjustItem.ppdStock === 'number' ? stockAdjustItem.ppdStock : 0;
+
     const currentBatches = getItemBatches(stockAdjustItem);
     let updatedBatches: StockBatch[] = [];
     let logBatchDetails = '';
+    let newImcStock = currentImcStock;
+    let newPpdStock = currentPpdStock;
 
-    if (adjustAction === 'REMOVE') {
-      if (qty > currentQty) {
-        alert(`Cannot remove ${qty} ${stockAdjustItem.unit}. Only ${currentQty} ${stockAdjustItem.unit} available in stock.`);
+    if (adjustAction === 'TRANSFER') {
+      if (qty > currentImcStock) {
+        alert(`Cannot transfer ${qty} ${stockAdjustItem.unit} from IMC Store. Only ${currentImcStock} ${stockAdjustItem.unit} available in IMC Store.`);
         return;
+      }
+      newImcStock = currentImcStock - qty;
+      newPpdStock = currentPpdStock + qty;
+      updatedBatches = currentBatches; // overall stock remains unchanged, just changing stores
+      logBatchDetails = `[Transferred from IMC Store to PPD Store]`;
+    } else if (adjustAction === 'REMOVE') {
+      const availableInStore = adjustStore === 'IMC' ? currentImcStock : currentPpdStock;
+      if (qty > availableInStore) {
+        alert(`Cannot remove ${qty} ${stockAdjustItem.unit} from ${adjustStore === 'IMC' ? 'IMC Store' : 'PPD Store'}. Only ${availableInStore} ${stockAdjustItem.unit} available in that store.`);
+        return;
+      }
+
+      if (adjustStore === 'IMC') {
+        newImcStock = currentImcStock - qty;
+      } else {
+        newPpdStock = currentPpdStock - qty;
       }
 
       if (adjustDeductMode === 'FEFO') {
@@ -732,7 +788,7 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
           return { ...batch, quantity: batch.quantity - deductFromThis };
         });
 
-        logBatchDetails = `[FEFO Auto Deduct: ${deductedNames.join(', ')}]`;
+        logBatchDetails = `[FEFO Auto Deduct from ${adjustStore} Store: ${deductedNames.join(', ')}]`;
       } else {
         // Specific batch deduction
         const targetBatch = currentBatches.find(b => b.id === adjustSelectedBatchId) || currentBatches[0];
@@ -743,10 +799,16 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
         updatedBatches = currentBatches.map(b => 
           b.id === targetBatch.id ? { ...b, quantity: b.quantity - qty } : b
         );
-        logBatchDetails = `[Deducted from Lot ${targetBatch.batchNumber}]`;
+        logBatchDetails = `[Deducted from Lot ${targetBatch.batchNumber} in ${adjustStore} Store]`;
       }
     } else {
       // ADD STOCK
+      if (adjustStore === 'IMC') {
+        newImcStock = currentImcStock + qty;
+      } else {
+        newPpdStock = currentPpdStock + qty;
+      }
+
       if (adjustBatchMode === 'NEW_BATCH') {
         const lotNum = adjustBatchLotNum.trim() || `LOT-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`;
         const newBatch: StockBatch = {
@@ -757,20 +819,30 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
           receivedDate: new Date().toISOString().split('T')[0],
         };
         updatedBatches = [...currentBatches, newBatch];
-        logBatchDetails = `[Added New Batch ${lotNum}, Exp: ${adjustBatchExpiry}]`;
+        logBatchDetails = `[Added New Batch ${lotNum} to ${adjustStore} Store, Exp: ${adjustBatchExpiry}]`;
       } else {
         const targetBatch = currentBatches.find(b => b.id === adjustSelectedBatchId) || currentBatches[0];
         updatedBatches = currentBatches.map(b => 
           b.id === targetBatch.id ? { ...b, quantity: b.quantity + qty } : b
         );
-        logBatchDetails = `[Added to Existing Lot ${targetBatch.batchNumber}]`;
+        logBatchDetails = `[Added to Existing Lot ${targetBatch.batchNumber} in ${adjustStore} Store]`;
       }
     }
 
-    const updatedItem = recalculateItemBatches(stockAdjustItem, updatedBatches);
+    const updatedItemTmp = recalculateItemBatches(stockAdjustItem, updatedBatches);
+    const updatedItem: StockItem = {
+      ...updatedItemTmp,
+      imcStock: newImcStock,
+      ppdStock: newPpdStock,
+      currentStock: adjustAction === 'TRANSFER' ? currentQty : updatedItemTmp.currentStock
+    };
 
     setItems(prev => prev.map(item => item.id === updatedItem.id ? updatedItem : item));
     saveItemToFirestore(updatedItem);
+
+    const destOrSrcText = adjustAction === 'TRANSFER' 
+      ? `Transferred IMC ➔ PPD` 
+      : `${adjustDestination.trim()} (${adjustStore} Store)`;
 
     const newTrx: StockTransaction = {
       id: `trx-${Date.now()}`,
@@ -780,7 +852,7 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
       quantity: qty,
       stockBefore: currentQty,
       stockAfter: updatedItem.currentStock,
-      destinationOrSource: `${adjustDestination.trim()} ${logBatchDetails}`,
+      destinationOrSource: `${destOrSrcText} ${logBatchDetails}`,
       staffName: adjustStaffName.trim(),
       notes: adjustNotes.trim(),
       timestamp: new Date().toISOString()
@@ -1065,6 +1137,55 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
       {viewMode === 'inventory' && (
         <div className="space-y-4">
           
+          {/* Store Location Filter Tabs */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 bg-slate-100/80 p-1.5 rounded-2xl border border-slate-200/60 shadow-2xs">
+            <button
+              onClick={() => setSelectedStoreFilter('ALL')}
+              className={`py-2.5 px-4 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                selectedStoreFilter === 'ALL'
+                  ? 'bg-violet-600 text-white shadow-sm'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-white/50 bg-transparent'
+              }`}
+            >
+              <span>🌐 All Stores Combined</span>
+              <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                selectedStoreFilter === 'ALL' ? 'bg-violet-500 text-white' : 'bg-slate-200 text-slate-700'
+              }`}>
+                {items.length} items
+              </span>
+            </button>
+            <button
+              onClick={() => setSelectedStoreFilter('IMC')}
+              className={`py-2.5 px-4 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                selectedStoreFilter === 'IMC'
+                  ? 'bg-indigo-600 text-white shadow-sm'
+                  : 'text-slate-600 hover:text-indigo-900 hover:bg-white/50 bg-transparent'
+              }`}
+            >
+              <span>🏪 IMC Store (Central)</span>
+              <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                selectedStoreFilter === 'IMC' ? 'bg-indigo-500 text-white' : 'bg-indigo-100 text-indigo-800'
+              }`}>
+                {items.reduce((acc, item) => acc + (item.imcStock ?? item.currentStock), 0)} units
+              </span>
+            </button>
+            <button
+              onClick={() => setSelectedStoreFilter('PPD')}
+              className={`py-2.5 px-4 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                selectedStoreFilter === 'PPD'
+                  ? 'bg-teal-600 text-white shadow-sm'
+                  : 'text-slate-600 hover:text-teal-900 hover:bg-white/50 bg-transparent'
+              }`}
+            >
+              <span>🏥 PPD Store (Usage)</span>
+              <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                selectedStoreFilter === 'PPD' ? 'bg-teal-500 text-white' : 'bg-teal-100 text-teal-800'
+              }`}>
+                {items.reduce((acc, item) => acc + (item.ppdStock ?? 0), 0)} units
+              </span>
+            </button>
+          </div>
+          
           {/* Search, Filter & Layout View Switcher Control Bar */}
           <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between">
             {/* Search Box */}
@@ -1258,39 +1379,63 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
                       </div>
 
                       {/* Stock Quantity Highlight Box */}
-                      <div className={`p-3 rounded-xl mb-3 border flex items-center justify-between ${
+                      <div className={`p-3 rounded-xl mb-3 border flex flex-col gap-2 ${
                         isOutOfStock 
                           ? 'bg-rose-100/80 border-rose-200 text-rose-950'
                           : isLowStock 
                             ? 'bg-amber-100/80 border-amber-200 text-amber-950' 
                             : 'bg-slate-50 border-slate-200/80 text-slate-800'
                       }`}>
-                        <div>
-                          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Available Stock</p>
-                          <div className="flex items-baseline gap-1.5 mt-0.5">
-                            <span className={`text-2xl font-black font-mono ${
-                              isOutOfStock ? 'text-rose-600' : isLowStock ? 'text-amber-700' : 'text-slate-900'
-                            }`}>
-                              {item.currentStock}
-                            </span>
-                            <span className="text-xs font-bold text-slate-600">{item.unit}</span>
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">
+                              {selectedStoreFilter === 'ALL' ? 'Total Combined Stock' : selectedStoreFilter === 'IMC' ? 'IMC Store Stock' : 'PPD Store Stock'}
+                            </p>
+                            <div className="flex items-baseline gap-1.5 mt-0.5">
+                              <span className={`text-2xl font-black font-mono ${
+                                isOutOfStock ? 'text-rose-600' : isLowStock ? 'text-amber-700' : 'text-slate-900'
+                              }`}>
+                                {selectedStoreFilter === 'ALL' 
+                                  ? item.currentStock 
+                                  : selectedStoreFilter === 'IMC' 
+                                    ? (item.imcStock ?? item.currentStock) 
+                                    : (item.ppdStock ?? 0)}
+                              </span>
+                              <span className="text-xs font-bold text-slate-600">{item.unit}</span>
+                            </div>
+                          </div>
+
+                          <div className="text-right">
+                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Warning Limit</p>
+                            <div className="flex items-center gap-1 justify-end mt-0.5">
+                              <span className="text-xs font-extrabold font-mono text-slate-700">≤ {item.warningThreshold} {item.unit}</span>
+                              <button
+                                onClick={() => {
+                                  setThresholdItem(item);
+                                  setNewThresholdValue(item.warningThreshold);
+                                }}
+                                className="p-1 text-violet-600 hover:bg-violet-100 rounded-md transition-colors"
+                                title="Adjust warning threshold limit"
+                              >
+                                <Edit3 className="w-3 h-3" />
+                              </button>
+                            </div>
                           </div>
                         </div>
 
-                        <div className="text-right">
-                          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Warning Limit</p>
-                          <div className="flex items-center gap-1 justify-end mt-0.5">
-                            <span className="text-xs font-extrabold font-mono text-slate-700">≤ {item.warningThreshold} {item.unit}</span>
-                            <button
-                              onClick={() => {
-                                setThresholdItem(item);
-                                setNewThresholdValue(item.warningThreshold);
-                              }}
-                              className="p-1 text-violet-600 hover:bg-violet-100 rounded-md transition-colors"
-                              title="Adjust warning threshold limit"
-                            >
-                              <Edit3 className="w-3 h-3" />
-                            </button>
+                        {/* Store Allocation Breakdown */}
+                        <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-200/60 text-[10px]">
+                          <div className={`px-2 py-1 rounded-lg flex items-center justify-between ${
+                            selectedStoreFilter === 'IMC' ? 'bg-indigo-600 text-white font-extrabold shadow-2xs' : 'bg-slate-100/70 text-slate-700 font-bold'
+                          }`}>
+                            <span className="flex items-center gap-1">🏪 IMC:</span>
+                            <span className="font-mono">{item.imcStock ?? item.currentStock}</span>
+                          </div>
+                          <div className={`px-2 py-1 rounded-lg flex items-center justify-between ${
+                            selectedStoreFilter === 'PPD' ? 'bg-teal-600 text-white font-extrabold shadow-2xs' : 'bg-slate-100/70 text-slate-700 font-bold'
+                          }`}>
+                            <span className="flex items-center gap-1">🏥 PPD:</span>
+                            <span className="font-mono">{item.ppdStock ?? 0}</span>
                           </div>
                         </div>
                       </div>
@@ -1469,15 +1614,32 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
 
                           {/* Column 2: Current Stock Level */}
                           <td className="py-3 px-4 text-center">
-                            <div className="inline-flex flex-col items-center">
+                            <div className="inline-flex flex-col items-center gap-1">
                               <span className={`text-base font-black font-mono ${
                                 isOutOfStock ? 'text-rose-600' : isLowStock ? 'text-amber-700' : 'text-slate-900'
                               }`}>
-                                {item.currentStock} <span className="text-xs font-normal text-slate-500">{item.unit}</span>
+                                {selectedStoreFilter === 'ALL' 
+                                  ? item.currentStock 
+                                  : selectedStoreFilter === 'IMC' 
+                                    ? (item.imcStock ?? item.currentStock) 
+                                    : (item.ppdStock ?? 0)} <span className="text-xs font-normal text-slate-500">{item.unit}</span>
                               </span>
-                              <span className="text-[10px] text-slate-400 font-medium">
-                                Limit: ≤ {item.warningThreshold}
-                              </span>
+                              <div className="flex gap-1 text-[9px] font-bold">
+                                <span className={`px-1 rounded-sm border ${
+                                  selectedStoreFilter === 'IMC' 
+                                    ? 'bg-indigo-600 border-indigo-700 text-white font-extrabold' 
+                                    : 'bg-indigo-50 border-indigo-100 text-indigo-700'
+                                }`}>
+                                  IMC: {item.imcStock ?? item.currentStock}
+                                </span>
+                                <span className={`px-1 rounded-sm border ${
+                                  selectedStoreFilter === 'PPD' 
+                                    ? 'bg-teal-600 border-teal-700 text-white font-extrabold' 
+                                    : 'bg-teal-50 border-teal-100 text-teal-700'
+                                }`}>
+                                  PPD: {item.ppdStock ?? 0}
+                                </span>
+                              </div>
                             </div>
                           </td>
 
@@ -1652,20 +1814,36 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
                 />
               </div>
 
-              {/* Initial Current Stock */}
-              <div className="space-y-1">
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide">
-                  Current Stock Quantity *
-                </label>
-                <input
-                  type="number"
-                  required
-                  min="0"
-                  placeholder="e.g. 500"
-                  value={newItemStock}
-                  onChange={(e) => setNewItemStock(e.target.value === '' ? '' : parseInt(e.target.value))}
-                  className="w-full px-3.5 py-2.5 text-xs font-mono font-bold border border-slate-300 rounded-xl focus:ring-2 focus:ring-violet-500 bg-slate-50/30"
-                />
+              {/* Initial Current Stock split into 2 stores */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide flex items-center gap-1">
+                    <span>🏪 IMC Store Qty *</span>
+                  </label>
+                  <input
+                    type="number"
+                    required
+                    min="0"
+                    placeholder="e.g. 100"
+                    value={newItemImcStock}
+                    onChange={(e) => setNewItemImcStock(e.target.value === '' ? '' : parseInt(e.target.value))}
+                    className="w-full px-3.5 py-2.5 text-xs font-mono font-bold border border-slate-300 rounded-xl focus:ring-2 focus:ring-violet-500 bg-slate-50/30"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide flex items-center gap-1">
+                    <span>🏥 PPD Store Qty *</span>
+                  </label>
+                  <input
+                    type="number"
+                    required
+                    min="0"
+                    placeholder="e.g. 0"
+                    value={newItemPpdStock}
+                    onChange={(e) => setNewItemPpdStock(e.target.value === '' ? '' : parseInt(e.target.value))}
+                    className="w-full px-3.5 py-2.5 text-xs font-mono font-bold border border-slate-300 rounded-xl focus:ring-2 focus:ring-violet-500 bg-slate-50/30"
+                  />
+                </div>
               </div>
 
               {/* Unit of Measurement */}
@@ -1994,13 +2172,27 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div className="flex items-center gap-2">
                 <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-white ${
-                  adjustAction === 'ADD' ? 'bg-emerald-600' : 'bg-rose-600'
+                  adjustAction === 'ADD' 
+                    ? 'bg-emerald-600' 
+                    : adjustAction === 'REMOVE' 
+                      ? 'bg-rose-600' 
+                      : 'bg-indigo-600'
                 }`}>
-                  {adjustAction === 'ADD' ? <PlusCircle className="w-4 h-4" /> : <MinusCircle className="w-4 h-4" />}
+                  {adjustAction === 'ADD' ? (
+                    <PlusCircle className="w-4 h-4" />
+                  ) : adjustAction === 'REMOVE' ? (
+                    <MinusCircle className="w-4 h-4" />
+                  ) : (
+                    <ArrowLeftRight className="w-4 h-4" />
+                  )}
                 </div>
                 <div>
                   <h3 className="font-extrabold text-sm text-slate-900">
-                    {adjustAction === 'ADD' ? 'Add Stock (Indent Received)' : 'Remove / Issue Stock'}
+                    {adjustAction === 'ADD' 
+                      ? 'Add Stock (Indent Received)' 
+                      : adjustAction === 'REMOVE' 
+                        ? 'Remove / Issue Stock' 
+                        : 'Transfer Store Stock (IMC ➔ PPD)'}
                   </h3>
                   <p className="text-[11px] text-slate-500 truncate max-w-[280px]">
                     {stockAdjustItem.name}
@@ -2019,11 +2211,11 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
             <form onSubmit={handleSaveStockAdjustment} className="space-y-4">
               
               {/* Action Selector */}
-              <div className="grid grid-cols-2 gap-2 bg-slate-100 p-1 rounded-2xl">
+              <div className="grid grid-cols-3 gap-1 bg-slate-100 p-1 rounded-2xl">
                 <button
                   type="button"
                   onClick={() => setAdjustAction('ADD')}
-                  className={`py-2 text-xs font-bold rounded-xl transition-all ${
+                  className={`py-2 text-[10px] sm:text-xs font-bold rounded-xl transition-all ${
                     adjustAction === 'ADD' 
                       ? 'bg-emerald-600 text-white shadow-xs' 
                       : 'text-slate-600 hover:text-slate-900'
@@ -2034,15 +2226,64 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
                 <button
                   type="button"
                   onClick={() => setAdjustAction('REMOVE')}
-                  className={`py-2 text-xs font-bold rounded-xl transition-all ${
+                  className={`py-2 text-[10px] sm:text-xs font-bold rounded-xl transition-all ${
                     adjustAction === 'REMOVE' 
                       ? 'bg-rose-600 text-white shadow-xs' 
                       : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
-                  - Remove Stock
+                  - Remove
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAdjustAction('TRANSFER');
+                    setAdjustStore('IMC'); // Transfer always from IMC
+                  }}
+                  className={`py-2 text-[10px] sm:text-xs font-bold rounded-xl transition-all ${
+                    adjustAction === 'TRANSFER' 
+                      ? 'bg-indigo-600 text-white shadow-xs' 
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  ⇄ Transfer IMC➔PPD
                 </button>
               </div>
+
+              {/* Store Selection (Only for Add/Remove) */}
+              {adjustAction !== 'TRANSFER' && (
+                <div className="space-y-1">
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide">
+                    Select Target Store / Location *
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setAdjustStore('IMC')}
+                      className={`py-2 text-xs font-bold rounded-xl border transition-all flex items-center justify-center gap-1.5 ${
+                        adjustStore === 'IMC'
+                          ? 'border-violet-600 bg-violet-50 text-violet-700 font-extrabold shadow-2xs'
+                          : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                      }`}
+                    >
+                      <span>🏪 IMC Store</span>
+                      <span className="text-[10px] opacity-75">({stockAdjustItem.imcStock ?? stockAdjustItem.currentStock} {stockAdjustItem.unit})</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAdjustStore('PPD')}
+                      className={`py-2 text-xs font-bold rounded-xl border transition-all flex items-center justify-center gap-1.5 ${
+                        adjustStore === 'PPD'
+                          ? 'border-violet-600 bg-violet-50 text-violet-700 font-extrabold shadow-2xs'
+                          : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                      }`}
+                    >
+                      <span>🏥 PPD Store</span>
+                      <span className="text-[10px] opacity-75">({stockAdjustItem.ppdStock ?? 0} {stockAdjustItem.unit})</span>
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* Quantity */}
               <div className="space-y-1">
@@ -2055,11 +2296,20 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
                   min="1"
                   value={adjustQuantity}
                   onChange={(e) => setAdjustQuantity(e.target.value === '' ? '' : parseInt(e.target.value))}
-                  className="w-full px-3.5 py-2.5 text-xs font-mono font-bold border border-slate-300 rounded-xl focus:ring-2 focus:ring-violet-500"
+                  className="w-full px-3.5 py-2.5 text-xs font-mono font-bold border border-slate-300 rounded-xl focus:ring-2 focus:ring-violet-500 bg-slate-50/20"
                 />
-                <p className="text-[10px] text-slate-400">
-                  Current Stock: {stockAdjustItem.currentStock} {stockAdjustItem.unit}
-                </p>
+                <div className="flex items-center justify-between text-[10px] text-slate-500 font-bold">
+                  <span>Total Stock: {stockAdjustItem.currentStock} {stockAdjustItem.unit}</span>
+                  {adjustAction === 'TRANSFER' ? (
+                    <span className="text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded-md">
+                      Transferring from IMC ({stockAdjustItem.imcStock ?? stockAdjustItem.currentStock}) to PPD ({stockAdjustItem.ppdStock ?? 0})
+                    </span>
+                  ) : (
+                    <span className="text-violet-700 bg-violet-50 px-1.5 py-0.5 rounded-md">
+                      Selected store stock: {adjustStore === 'IMC' ? (stockAdjustItem.imcStock ?? stockAdjustItem.currentStock) : (stockAdjustItem.ppdStock ?? 0)} {stockAdjustItem.unit}
+                    </span>
+                  )}
+                </div>
               </div>
 
               {/* Batch / Expiration Options */}
@@ -2131,7 +2381,7 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
                     </div>
                   )}
                 </div>
-              ) : (
+              ) : adjustAction === 'REMOVE' ? (
                 <div className="space-y-2 bg-rose-50/60 p-3 rounded-2xl border border-rose-100">
                   <label className="block text-xs font-bold text-rose-950 uppercase tracking-wide">
                     Stock Deduction Strategy (FEFO)
@@ -2180,27 +2430,43 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
                     </div>
                   )}
                 </div>
+              ) : (
+                <div className="space-y-2 bg-indigo-50/60 p-4 rounded-2xl border border-indigo-100">
+                  <label className="block text-xs font-extrabold text-indigo-950 uppercase tracking-wide flex items-center gap-1.5">
+                    <span>🔄 IMC Store ➔ PPD Store Transfer</span>
+                  </label>
+                  <p className="text-[11px] text-indigo-900 leading-relaxed font-medium">
+                    This shifts items from the **IMC Store** to the **PPD Store** for localized usage. 
+                  </p>
+                  <ul className="text-[10px] text-slate-600 list-disc list-inside space-y-1 font-medium bg-white/70 p-2.5 rounded-xl border border-indigo-50">
+                    <li>Decrements balance in **IMC Store**</li>
+                    <li>Increments balance in **PPD Store**</li>
+                    <li>Keeps overall total inventory identical</li>
+                  </ul>
+                </div>
               )}
 
               {/* Destination / Recipient (Where stock goes or send to who) */}
-              <div className="space-y-1">
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide">
-                  {adjustAction === 'REMOVE' ? 'Where stock goes / Sent to who *' : 'Indent Origin / Batch Supplier *'}
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder={adjustAction === 'REMOVE' ? 'e.g. Ward 4B, Dr. Tan Clinic, Emergency Unit, Discarded' : 'e.g. HSA Store Utama Indent Batch #2026-90'}
-                  value={adjustDestination}
-                  onChange={(e) => setAdjustDestination(e.target.value)}
-                  className="w-full px-3.5 py-2.5 text-xs font-medium border border-slate-300 rounded-xl focus:ring-2 focus:ring-violet-500"
-                />
-              </div>
+              {adjustAction !== 'TRANSFER' && (
+                <div className="space-y-1">
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide">
+                    {adjustAction === 'REMOVE' ? 'Where stock goes / Sent to who *' : 'Indent Origin / Batch Supplier *'}
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder={adjustAction === 'REMOVE' ? 'e.g. Ward 4B, Dr. Tan Clinic, Emergency Unit, Discarded' : 'e.g. HSA Store Utama Indent Batch #2026-90'}
+                    value={adjustDestination}
+                    onChange={(e) => setAdjustDestination(e.target.value)}
+                    className="w-full px-3.5 py-2.5 text-xs font-medium border border-slate-300 rounded-xl focus:ring-2 focus:ring-violet-500 bg-white"
+                  />
+                </div>
+              )}
 
-              {/* Person who added/removed stock */}
+              {/* Person who added/removed/transferred stock */}
               <div className="space-y-1">
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide">
-                  Staff Responsible (Added / Removed By) *
+                  Staff Responsible (Handled By) *
                 </label>
                 <input
                   type="text"
@@ -2208,7 +2474,7 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
                   placeholder="e.g. MA Shafiq, SN Farida, Nurse Aminah"
                   value={adjustStaffName}
                   onChange={(e) => setAdjustStaffName(e.target.value)}
-                  className="w-full px-3.5 py-2.5 text-xs font-bold border border-slate-300 rounded-xl focus:ring-2 focus:ring-violet-500"
+                  className="w-full px-3.5 py-2.5 text-xs font-bold border border-slate-300 rounded-xl focus:ring-2 focus:ring-violet-500 bg-white"
                 />
               </div>
 
@@ -2219,10 +2485,10 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. Routine weekly replenishment"
+                  placeholder="e.g. Weekly replenishment transfer to clinic"
                   value={adjustNotes}
                   onChange={(e) => setAdjustNotes(e.target.value)}
-                  className="w-full px-3.5 py-2.5 text-xs font-medium border border-slate-300 rounded-xl focus:ring-2 focus:ring-violet-500"
+                  className="w-full px-3.5 py-2.5 text-xs font-medium border border-slate-300 rounded-xl focus:ring-2 focus:ring-violet-500 bg-white"
                 />
               </div>
 
@@ -2237,7 +2503,11 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
                 <button
                   type="submit"
                   className={`px-5 py-2 rounded-xl text-white text-xs font-bold transition-all shadow-md ${
-                    adjustAction === 'ADD' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-rose-600 hover:bg-rose-700'
+                    adjustAction === 'ADD' 
+                      ? 'bg-emerald-600 hover:bg-emerald-700' 
+                      : adjustAction === 'REMOVE' 
+                        ? 'bg-rose-600 hover:bg-rose-700' 
+                        : 'bg-indigo-600 hover:bg-indigo-700'
                   }`}
                 >
                   Confirm & Save Log
