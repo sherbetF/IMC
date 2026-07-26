@@ -13,7 +13,8 @@ import {
   writeBatch 
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL, deleteObject, getStorage } from 'firebase/storage';
-import app, { db, storage } from '../lib/firebase';
+import { signInAnonymously } from 'firebase/auth';
+import app, { db, storage, auth } from '../lib/firebase';
 import { MedicalReport, StorageStats, FilterState } from '../types';
 import { FIREBASE_FREE_TIER_LIMIT_BYTES, formatBytes } from '../data/presetData';
 import { generateSampleReports } from '../data/sampleGenerator';
@@ -271,8 +272,17 @@ export const ReportProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     // Attempt Firebase Storage upload for all files when rawFile exists
     if (rawFile) {
       try {
+        if (!auth.currentUser) {
+          try {
+            await signInAnonymously(auth);
+          } catch (aErr) {
+            console.warn('Anonymous sign-in for Storage upload notice:', aErr);
+          }
+        }
+
         const cleanFileName = (rawFile.name || 'medical_report.pdf').replace(/[^a-zA-Z0-9_.-]/g, '_');
-        storagePath = `medical_reports/${currentUser.uid}/${Date.now()}_${cleanFileName}`;
+        const activeUid = auth.currentUser?.uid || currentUser.uid || 'public_user';
+        storagePath = `medical_reports/${activeUid}/${Date.now()}_${cleanFileName}`;
         
         try {
           const storageRef = ref(storage, storagePath);
@@ -287,9 +297,9 @@ export const ReportProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           downloadUrl = await getDownloadURL(uploadSnapshot.ref);
           console.log('Firebase Storage upload succeeded:', downloadUrl);
         } catch (primaryStorageErr) {
-          console.warn('Primary Firebase Storage upload warning, attempting fallback storage bucket...', primaryStorageErr);
+          console.warn('Primary Firebase Storage upload warning, attempting default storage bucket...', primaryStorageErr);
           try {
-            const fallbackStorage = getStorage(app, 'gs://outsource-f1e0f.firebasestorage.app');
+            const fallbackStorage = getStorage(app);
             const fallbackRef = ref(fallbackStorage, storagePath);
             const uploadSnapshot = await uploadBytes(fallbackRef, rawFile, {
               contentType: rawFile.type || 'application/pdf',
@@ -298,7 +308,7 @@ export const ReportProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             downloadUrl = await getDownloadURL(uploadSnapshot.ref);
             console.log('Fallback Firebase Storage upload succeeded:', downloadUrl);
           } catch (fallbackErr) {
-            console.warn('Secondary Firebase Storage upload warning, relying on Firestore Base64 sync:', fallbackErr);
+            console.warn('Secondary Firebase Storage upload notice:', fallbackErr);
           }
         }
       } catch (storageErr) {

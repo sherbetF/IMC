@@ -4,7 +4,8 @@ import {
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword, 
   signOut as firebaseSignOut, 
-  onAuthStateChanged 
+  onAuthStateChanged,
+  signInAnonymously
 } from 'firebase/auth';
 import { auth } from '../lib/firebase';
 
@@ -53,12 +54,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return;
     }
 
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
         setIsDemoUser(false);
+        setCurrentUser(user);
+        setLoading(false);
+      } else {
+        // Automatically sign in anonymously so Firebase Storage and Firestore uploads work seamlessly
+        try {
+          const anonCred = await signInAnonymously(auth);
+          setCurrentUser(anonCred.user);
+        } catch (err) {
+          console.warn('Anonymous Firebase auth notice:', err);
+          setCurrentUser(null);
+        } finally {
+          setLoading(false);
+        }
       }
-      setCurrentUser(user);
-      setLoading(false);
     });
 
     return unsubscribe;
