@@ -193,12 +193,17 @@ export const EchoCases: React.FC = () => {
         setMediaType('image');
       }
 
-      // Read as Data URI for preview
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        setMediaPreviewUrl(event.target?.result as string || '');
-      };
-      reader.readAsDataURL(file);
+      // Use lightweight Object URL for fast media preview without memory bloat
+      try {
+        const blobUrl = URL.createObjectURL(file);
+        setMediaPreviewUrl(blobUrl);
+      } catch {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          setMediaPreviewUrl(event.target?.result as string || '');
+        };
+        reader.readAsDataURL(file);
+      }
     }
   };
 

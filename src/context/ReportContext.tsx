@@ -141,10 +141,15 @@ export const ReportProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // Save to local storage cache whenever reports change for resilient offline support
   useEffect(() => {
     if (currentUser && reports.length >= 0) {
-      if (isDemoUser) {
-        localStorage.setItem('outsource_db_reports_demo', JSON.stringify(reports));
-      } else {
-        localStorage.setItem(`outsource_db_reports_${currentUser.uid}`, JSON.stringify(reports));
+      const storageKey = isDemoUser ? 'outsource_db_reports_demo' : `outsource_db_reports_${currentUser.uid}`;
+      try {
+        const sanitizedForStorage = reports.map(r => ({
+          ...r,
+          fileData: (r.fileData && (r.fileData.startsWith('blob:') || r.fileData.length > 100000)) ? '' : r.fileData
+        }));
+        localStorage.setItem(storageKey, JSON.stringify(sanitizedForStorage));
+      } catch (err) {
+        console.warn('LocalStorage save skipped due to quota or storage restrictions:', err);
       }
     }
   }, [reports, currentUser, isDemoUser]);
@@ -276,6 +281,10 @@ export const ReportProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       storagePath: storagePath || undefined
     };
 
+    const sanitizedFileDataForFirestore = (newReportData.fileData && (newReportData.fileData.startsWith('blob:') || newReportData.fileData.length > 200000))
+      ? ''
+      : (newReportData.fileData || '');
+
     try {
       const colRef = collection(db, 'medical_reports');
       const docRef = await addDoc(colRef, cleanForFirestore({
@@ -287,7 +296,7 @@ export const ReportProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         notes: reportToSave.notes || '',
         downloadUrl: downloadUrl || '',
         storagePath: storagePath || '',
-        fileData: reportToSave.fileData || ''
+        fileData: sanitizedFileDataForFirestore
       }));
 
       reportToSave.id = docRef.id;

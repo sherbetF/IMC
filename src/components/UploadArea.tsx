@@ -61,12 +61,17 @@ export const UploadArea: React.FC<{ onSuccess?: () => void }> = ({ onSuccess }) 
     const cleanIc = icNumber.trim();
     setFileName(`${cleanName || 'Patient'}_${cleanIc || 'IC'}_${subCategory.split(' ')[0]}_${hospital.replace(/ /g, '_')}.pdf`);
 
-    // Read as Data URI for PDF preview
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      setFileDataUri(e.target?.result as string || '');
-    };
-    reader.readAsDataURL(file);
+    // Create lightweight Object URL for fast PDF preview without memory bloat
+    try {
+      const blobUrl = URL.createObjectURL(file);
+      setFileDataUri(blobUrl);
+    } catch {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setFileDataUri(e.target?.result as string || '');
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
