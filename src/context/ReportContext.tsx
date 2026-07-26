@@ -12,8 +12,8 @@ import {
   orderBy, 
   writeBatch 
 } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
-import { db, storage } from '../lib/firebase';
+import { ref, uploadBytes, getDownloadURL, deleteObject, getStorage } from 'firebase/storage';
+import app, { db, storage } from '../lib/firebase';
 import { MedicalReport, StorageStats, FilterState } from '../types';
 import { FIREBASE_FREE_TIER_LIMIT_BYTES, formatBytes } from '../data/presetData';
 import { generateSampleReports } from '../data/sampleGenerator';
@@ -273,18 +273,34 @@ export const ReportProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       try {
         const cleanFileName = (rawFile.name || 'medical_report.pdf').replace(/[^a-zA-Z0-9_.-]/g, '_');
         storagePath = `medical_reports/${currentUser.uid}/${Date.now()}_${cleanFileName}`;
-        const storageRef = ref(storage, storagePath);
         
-        const uploadSnapshot = await uploadBytes(storageRef, rawFile, {
-          contentType: rawFile.type || 'application/pdf',
-          contentDisposition: 'inline',
-          customMetadata: {
-            patientName: newReportData.patientName || '',
-            hospital: newReportData.hospital || ''
+        try {
+          const storageRef = ref(storage, storagePath);
+          const uploadSnapshot = await uploadBytes(storageRef, rawFile, {
+            contentType: rawFile.type || 'application/pdf',
+            contentDisposition: 'inline',
+            customMetadata: {
+              patientName: newReportData.patientName || '',
+              hospital: newReportData.hospital || ''
+            }
+          });
+          downloadUrl = await getDownloadURL(uploadSnapshot.ref);
+          console.log('Firebase Storage upload succeeded:', downloadUrl);
+        } catch (primaryStorageErr) {
+          console.warn('Primary Firebase Storage upload warning, attempting fallback storage bucket...', primaryStorageErr);
+          try {
+            const fallbackStorage = getStorage(app, 'gs://outsource-f1e0f.firebasestorage.app');
+            const fallbackRef = ref(fallbackStorage, storagePath);
+            const uploadSnapshot = await uploadBytes(fallbackRef, rawFile, {
+              contentType: rawFile.type || 'application/pdf',
+              contentDisposition: 'inline'
+            });
+            downloadUrl = await getDownloadURL(uploadSnapshot.ref);
+            console.log('Fallback Firebase Storage upload succeeded:', downloadUrl);
+          } catch (fallbackErr) {
+            console.warn('Secondary Firebase Storage upload warning, relying on Firestore Base64 sync:', fallbackErr);
           }
-        });
-
-        downloadUrl = await getDownloadURL(uploadSnapshot.ref);
+        }
       } catch (storageErr) {
         console.warn('Firebase Storage upload warning, storing record with metadata and Base64 fallback:', storageErr);
       }
@@ -301,13 +317,14 @@ export const ReportProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     };
 
     // Sanitize fileData for Firestore doc size safety (Firestore limit is 1MB / ~1,048,576 bytes)
-    // If downloadUrl is present (Storage upload succeeded), we don't need large base64 string in Firestore.
-    // If downloadUrl is empty, keep base64FileData in Firestore (up to ~850,000 chars) so other devices can access the file.
+    // Keep base64FileData up to 850,000 characters (~600KB) so that even if Storage is restricted on some mobile networks, other devices can view the PDF directly!
     let firestoreFileData = '';
-    if (downloadUrl) {
-      firestoreFileData = (base64FileData && base64FileData.length < 100000) ? base64FileData : '';
+    if (base64FileData && base64FileData.length < 850000) {
+      firestoreFileData = base64FileData;
+    } else if (downloadUrl) {
+      firestoreFileData = '';
     } else {
-      firestoreFileData = (base64FileData && base64FileData.length < 850000) ? base64FileData : '';
+      firestoreFileData = base64FileData.substring(0, 850000);
     }
 
     try {
