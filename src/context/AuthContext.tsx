@@ -37,6 +37,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.warn('Could not set persistence to session:', err);
     });
 
+    // If there is no active session flag in sessionStorage, force sign out to require logging in first
+    const sessionActive = sessionStorage.getItem('logged_in_session');
+    if (!sessionActive) {
+      sessionStorage.removeItem('outsource_db_demo_user');
+      firebaseSignOut(auth).then(() => {
+        setCurrentUser(null);
+        setLoading(false);
+      }).catch(() => {
+        setLoading(false);
+      });
+      return;
+    }
+
     // Check if demo session exists in sessionStorage
     const savedDemo = sessionStorage.getItem('outsource_db_demo_user');
     if (savedDemo === 'true') {
@@ -78,15 +91,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsDemoUser(false);
     sessionStorage.removeItem('outsource_db_demo_user');
     await signInWithEmailAndPassword(auth, email.trim(), pass);
+    sessionStorage.setItem('logged_in_session', 'true');
   };
 
   const signup = async (email: string, pass: string) => {
     setIsDemoUser(false);
     sessionStorage.removeItem('outsource_db_demo_user');
     await createUserWithEmailAndPassword(auth, email.trim(), pass);
+    sessionStorage.setItem('logged_in_session', 'true');
   };
 
   const logout = async () => {
+    sessionStorage.removeItem('logged_in_session');
     if (isDemoUser) {
       setIsDemoUser(false);
       sessionStorage.removeItem('outsource_db_demo_user');
@@ -99,6 +115,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const demoLogin = () => {
     setIsDemoUser(true);
     sessionStorage.setItem('outsource_db_demo_user', 'true');
+    sessionStorage.setItem('logged_in_session', 'true');
     setCurrentUser({
       uid: 'demo-admin-uid',
       email: 'doctor@outsourcedb.med',

@@ -269,6 +269,12 @@ interface StockTakeHubProps {
 export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActiveTab }) => {
   const { currentUser } = useAuth();
 
+  // Track deleted items to prevent Firestore real-time snapshot sync overrides
+  const deletedItemIdsRef = React.useRef<Set<string>>(new Set());
+
+  // Inline confirmation state for deleting specific Lot/Expiry batch
+  const [confirmDeleteBatchId, setConfirmDeleteBatchId] = useState<string | null>(null);
+
   // Load items & logs from localStorage or defaults
   const [items, setItems] = useState<StockItem[]>(() => {
     try {
@@ -346,7 +352,10 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
       } else {
         const docs: StockItem[] = [];
         snapshot.forEach(docSnap => {
-          docs.push(docSnap.data() as StockItem);
+          const item = docSnap.data() as StockItem;
+          if (!deletedItemIdsRef.current.has(item.id)) {
+            docs.push(item);
+          }
         });
         setItems(docs);
         try {
@@ -932,7 +941,7 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
     }
 
     const targetBatch = currentBatches.find(b => b.id === batchId);
-    if (!confirm(`Are you sure you want to delete Lot ${targetBatch?.batchNumber || 'Batch'} (${targetBatch?.quantity} ${managingBatchesItem.unit})?`)) return;
+    // Removed native confirm block due to iframe sandbox restrictions; now handled via inline confirmation state in UI
 
     const updatedBatches = currentBatches.filter(b => b.id !== batchId);
     const updatedItem = recalculateItemBatches(managingBatchesItem, updatedBatches);
@@ -961,6 +970,7 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
 
   // Delete Stock Item
   const handleDeleteItem = (id: string) => {
+    deletedItemIdsRef.current.add(id);
     setItems(prev => prev.filter(i => i.id !== id));
     deleteItemFromFirestore(id);
     setDeletingItemId(null);
@@ -2744,13 +2754,36 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
                           </span>
                         </div>
 
-                        <button
-                          onClick={() => handleDeleteBatchFromItem(batch.id)}
-                          className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors"
-                          title="Delete Batch"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        {confirmDeleteBatchId === batch.id ? (
+                          <div className="flex items-center gap-1 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                handleDeleteBatchFromItem(batch.id);
+                                setConfirmDeleteBatchId(null);
+                              }}
+                              className="px-2 py-1 bg-rose-600 hover:bg-rose-700 text-white text-[10px] font-bold rounded-lg transition-colors"
+                            >
+                              Delete
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setConfirmDeleteBatchId(null)}
+                              className="px-2 py-1 bg-slate-200 hover:bg-slate-300 text-slate-700 text-[10px] font-bold rounded-lg transition-colors"
+                            >
+                              No
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setConfirmDeleteBatchId(batch.id)}
+                            className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors"
+                            title="Delete Batch"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
                       </div>
                     </div>
                   );
