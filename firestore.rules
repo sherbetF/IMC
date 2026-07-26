@@ -18,6 +18,15 @@ service cloud.firestore {
     match /medical_reports/{reportId} {
       allow read, write: if isAuthenticated();
     }
+
+    // Patient Profiles collection access for authenticated users
+    match /patient_profiles/{patientId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // Clerking Notes collection access for authenticated users
+    match /clerking_notes/{noteId} {
+      allow read, write: if isAuthenticated();
+    }
   }
 }
-

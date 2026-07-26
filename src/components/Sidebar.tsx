@@ -13,7 +13,18 @@ import {
   ChevronLeft,
   ChevronRight,
   PanelLeftClose,
-  PanelLeftOpen
+  PanelLeftOpen,
+  Heart,
+  CalendarDays,
+  Menu,
+  Users,
+  UserPlus,
+  Activity,
+  Package,
+  PlusCircle,
+  History,
+  TrendingUp,
+  Syringe
 } from 'lucide-react';
 import { useAuth, ADMIN_UID } from '../context/AuthContext';
 import { useReports } from '../context/ReportContext';
@@ -25,6 +36,8 @@ interface SidebarProps {
   onClose: () => void;
   isCollapsed?: boolean;
   onToggleCollapse?: () => void;
+  currentSubsection: 'portal' | 'outsource_database' | 'echocardiogram' | 'holter_schedule' | 'medical_records' | 'stock_take';
+  setCurrentSubsection: (sub: 'portal' | 'outsource_database' | 'echocardiogram' | 'holter_schedule' | 'medical_records' | 'stock_take') => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -33,7 +46,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isOpen,
   onClose,
   isCollapsed = false,
-  onToggleCollapse
+  onToggleCollapse,
+  currentSubsection,
+  setCurrentSubsection
 }) => {
   const { currentUser, logout, isDemoUser, isAdmin } = useAuth();
   const { storageStats } = useReports();
@@ -42,14 +57,89 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const collapsed = isCollapsed ?? internalCollapsed;
   const toggleCollapse = onToggleCollapse ?? (() => setInternalCollapsed(!internalCollapsed));
 
-  const navItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'admin', label: 'Admin Panel', icon: ShieldCheck, isAdminOnly: true },
-    { id: 'files', label: 'Medical Files', icon: FileText, count: storageStats.totalFiles },
-    { id: 'upload', label: 'Upload PDF', icon: Upload },
-    { id: 'analytics', label: 'Hospital Analytics', icon: BarChart3 },
-    { id: 'storage', label: 'Firebase Storage', icon: HardDrive },
-  ];
+  // Dynamically configure navItems based on Subsection
+  let navItems = [];
+  if (currentSubsection === 'outsource_database') {
+    navItems = [
+      { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+      { id: 'admin', label: 'Admin Panel', icon: ShieldCheck, isAdminOnly: true },
+      { id: 'files', label: 'Medical Files', icon: FileText, count: storageStats.totalFiles },
+      { id: 'upload', label: 'Upload PDF', icon: Upload },
+      { id: 'analytics', label: 'Hospital Analytics', icon: BarChart3 },
+      { id: 'storage', label: 'Firebase Storage', icon: HardDrive },
+    ];
+  } else if (currentSubsection === 'echocardiogram') {
+    navItems = [
+      { id: 'echo_calculator', label: 'Diastolic Function', icon: LayoutDashboard },
+      { id: 'echo_ph', label: 'Pulmonary Pressure (PASP)', icon: Activity },
+      { id: 'echo_rv_fac', label: 'RV FAC Calculator', icon: Heart },
+      { id: 'echo_as', label: 'Aortic Stenosis', icon: BarChart3 },
+      { id: 'echo_ar_pht', label: 'AR Pressure Half Time', icon: Activity },
+      { id: 'echo_ms', label: 'Mitral Stenosis', icon: FileText },
+      { id: 'echo_cases', label: 'Echo Cases', icon: Database },
+    ];
+  } else if (currentSubsection === 'holter_schedule') {
+    navItems = [
+      { id: 'holter_schedule', label: 'Holter Scheduler', icon: CalendarDays },
+    ];
+  } else if (currentSubsection === 'medical_records') {
+    navItems = [
+      { id: 'medical_records', label: 'TMR Dashboard', icon: LayoutDashboard },
+      { id: 'patients_directory', label: 'Patients Directory', icon: Users },
+      { id: 'register_patient', label: 'Register Patient', icon: UserPlus },
+    ];
+  } else if (currentSubsection === 'stock_take') {
+    navItems = [
+      { id: 'stock_inventory', label: 'Stock Inventory', icon: Package },
+      { id: 'stock_logs', label: 'Transaction Logs', icon: History },
+      { id: 'stock_summary', label: 'Indent & RM Summary', icon: TrendingUp },
+    ];
+  }
+
+  // Brand Info depending on Section
+  const getBrandDetails = () => {
+    switch (currentSubsection) {
+      case 'echocardiogram':
+        return {
+          title: 'Echo Suite',
+          sub: 'Calculator & Cases',
+          icon: Heart,
+          color: 'bg-rose-600'
+        };
+      case 'holter_schedule':
+        return {
+          title: 'Cardioscan',
+          sub: 'Holter Scheduler',
+          icon: CalendarDays,
+          color: 'bg-blue-600'
+        };
+      case 'medical_records':
+        return {
+          title: 'TMR Registry',
+          sub: 'Temp Medical Records',
+          icon: Heart,
+          color: 'bg-teal-600'
+        };
+      case 'stock_take':
+        return {
+          title: 'Stock System',
+          sub: 'Stock Management System',
+          icon: Syringe,
+          color: 'bg-violet-600'
+        };
+      default:
+        return {
+          title: 'Outsource DB',
+          sub: 'Medical Scans Archive',
+          icon: Database,
+          color: 'bg-indigo-600'
+        };
+    }
+  };
+
+
+  const brand = getBrandDetails();
+  const BrandIcon = brand.icon;
 
   const handleNavClick = (id: string) => {
     setActiveTab(id);
@@ -86,21 +176,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 >
                   <PanelLeftOpen className="w-5 h-5 text-indigo-400 hover:text-white" />
                 </button>
-                <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center text-white shadow-md shadow-indigo-950/60 shrink-0" title="Outsource DB Medical Scans">
-                  <Database className="w-5 h-5" />
+                <div className={`w-10 h-10 rounded-xl ${brand.color} flex items-center justify-center text-white shadow-md shadow-indigo-950/60 shrink-0`} title={brand.title}>
+                  <BrandIcon className="w-5 h-5" />
                 </div>
               </div>
             ) : (
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-3 truncate">
-                  <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center text-white shadow-md shadow-indigo-950/60 shrink-0">
-                    <Database className="w-5 h-5" />
+                  <div className={`w-10 h-10 rounded-xl ${brand.color} flex items-center justify-center text-white shadow-md shadow-indigo-950/60 shrink-0`}>
+                    <BrandIcon className="w-5 h-5" />
                   </div>
                   <div className="truncate">
                     <h1 className="font-bold text-base tracking-tight text-white flex items-center gap-1.5 font-futuristic truncate">
-                      Outsource DB
+                      {brand.title}
                     </h1>
-                    <p className="text-[11px] text-indigo-300/80 font-medium truncate">Medical Scans Archive</p>
+                    <p className="text-[11px] text-indigo-300/80 font-medium truncate">{brand.sub}</p>
                   </div>
                 </div>
 
@@ -120,12 +210,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {/* Mobile Header Layout */}
             <div className="flex lg:hidden items-center justify-between">
               <div className="flex items-center space-x-3 truncate">
-                <div className="w-9 h-9 rounded-xl bg-indigo-600 flex items-center justify-center text-white shrink-0">
-                  <Database className="w-5 h-5" />
+                <div className={`w-9 h-9 rounded-xl ${brand.color} flex items-center justify-center text-white shrink-0`}>
+                  <BrandIcon className="w-5 h-5" />
                 </div>
                 <div>
-                  <h1 className="font-bold text-sm text-white">Outsource DB</h1>
-                  <p className="text-[10px] text-indigo-300/80">Medical Scans</p>
+                  <h1 className="font-bold text-sm text-white">{brand.title}</h1>
+                  <p className="text-[10px] text-indigo-300/80">{brand.sub}</p>
                 </div>
               </div>
               <button 
@@ -138,6 +228,37 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </button>
             </div>
           </div>
+
+          {/* Subsection Back Button */}
+          {!collapsed && (
+            <div className="px-3.5 py-2 border-b border-indigo-950/60 bg-indigo-950/20">
+              <button
+                onClick={() => {
+                  setCurrentSubsection('portal');
+                  onClose();
+                }}
+                className="w-full flex items-center justify-center gap-1.5 px-3 py-2 bg-indigo-950 hover:bg-[#1C163C] border border-indigo-900/50 hover:border-indigo-700 text-indigo-300 hover:text-white rounded-xl text-[11px] font-bold transition-all shadow-xs min-h-[38px]"
+              >
+                <ChevronLeft className="w-3.5 h-3.5" />
+                <span>← Main Portal Menu</span>
+              </button>
+            </div>
+          )}
+
+          {collapsed && (
+            <div className="py-2 flex justify-center border-b border-indigo-950/60 bg-indigo-950/20">
+              <button
+                onClick={() => {
+                  setCurrentSubsection('portal');
+                  onClose();
+                }}
+                className="p-2 rounded-xl bg-indigo-950 hover:bg-[#1C163C] text-indigo-300 hover:text-white border border-indigo-900/50"
+                title="Switch Sub-Section Portal"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+            </div>
+          )}
 
           {/* Nav Items */}
           <nav className="p-3 space-y-1.5 mt-2">
@@ -181,49 +302,51 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Sidebar Footer: Storage Gauge & Sign Out */}
         <div className="p-3 space-y-3 border-t border-indigo-950/80 bg-indigo-950/30">
-          {/* Storage Used Quick Gauge */}
-          <div 
-            onClick={() => handleNavClick('storage')}
-            className={`
-              p-3 rounded-xl bg-indigo-950/60 border border-indigo-900/60 cursor-pointer hover:border-indigo-700 transition-all group
-              ${collapsed ? 'lg:p-2 lg:text-center' : ''}
-            `}
-            title={collapsed ? `Storage Used: ${storageStats.usagePercentage}% (${storageStats.totalSizeFormatted})` : undefined}
-          >
-            {collapsed ? (
-              <div className="flex flex-col items-center justify-center space-y-1">
-                <HardDrive className={`w-5 h-5 ${storageStats.isNearLimit ? 'text-amber-400 animate-pulse' : 'text-indigo-400'}`} />
-                <span className="text-[10px] font-bold text-indigo-200">{storageStats.usagePercentage}%</span>
-              </div>
-            ) : (
-              <>
-                <div className="flex items-center justify-between mb-1.5">
-                  <div className="flex items-center space-x-2 text-xs font-medium text-indigo-200">
-                    <HardDrive className={`w-4 h-4 ${storageStats.isNearLimit ? 'text-amber-400 animate-pulse' : 'text-indigo-400'}`} />
-                    <span>Storage Used</span>
+          {/* Storage Used Quick Gauge (Only for Outsource Database) */}
+          {currentSubsection === 'outsource_database' && (
+            <div 
+              onClick={() => handleNavClick('storage')}
+              className={`
+                p-3 rounded-xl bg-indigo-950/60 border border-indigo-900/60 cursor-pointer hover:border-indigo-700 transition-all group
+                ${collapsed ? 'lg:p-2 lg:text-center' : ''}
+              `}
+              title={collapsed ? `Storage Used: ${storageStats.usagePercentage}% (${storageStats.totalSizeFormatted})` : undefined}
+            >
+              {collapsed ? (
+                <div className="flex flex-col items-center justify-center space-y-1">
+                  <HardDrive className={`w-5 h-5 ${storageStats.isNearLimit ? 'text-amber-400 animate-pulse' : 'text-indigo-400'}`} />
+                  <span className="text-[10px] font-bold text-indigo-200">{storageStats.usagePercentage}%</span>
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <div className="flex items-center space-x-2 text-xs font-medium text-indigo-200">
+                      <HardDrive className={`w-4 h-4 ${storageStats.isNearLimit ? 'text-amber-400 animate-pulse' : 'text-indigo-400'}`} />
+                      <span>Storage Used</span>
+                    </div>
+                    <span className="text-xs font-bold text-indigo-100">
+                      {storageStats.usagePercentage}%
+                    </span>
                   </div>
-                  <span className="text-xs font-bold text-indigo-100">
-                    {storageStats.usagePercentage}%
-                  </span>
-                </div>
 
-                {/* Progress Bar */}
-                <div className="w-full bg-indigo-950 h-2 rounded-full overflow-hidden mb-1.5">
-                  <div 
-                    className={`h-full transition-all duration-500 rounded-full ${
-                      storageStats.isNearLimit ? 'bg-amber-500' : 'bg-indigo-500'
-                    }`}
-                    style={{ width: `${Math.max(3, storageStats.usagePercentage)}%` }}
-                  />
-                </div>
+                  {/* Progress Bar */}
+                  <div className="w-full bg-indigo-950 h-2 rounded-full overflow-hidden mb-1.5">
+                    <div 
+                      className={`h-full transition-all duration-500 rounded-full ${
+                        storageStats.isNearLimit ? 'bg-amber-500' : 'bg-indigo-500'
+                      }`}
+                      style={{ width: `${Math.max(3, storageStats.usagePercentage)}%` }}
+                    />
+                  </div>
 
-                <div className="flex justify-between items-center text-[10px] text-indigo-300/70">
-                  <span>{storageStats.totalSizeFormatted}</span>
-                  <span>Limit: 5 GB</span>
-                </div>
-              </>
-            )}
-          </div>
+                  <div className="flex justify-between items-center text-[10px] text-indigo-300/70">
+                    <span>{storageStats.totalSizeFormatted}</span>
+                    <span>Limit: 5 GB</span>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
 
           {/* User Profile & Sign-Out Button */}
           <div className={`pt-1 flex items-center ${collapsed ? 'lg:justify-center' : 'justify-between'}`}>
@@ -236,7 +359,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <p className="text-xs font-semibold text-white truncate max-w-[110px]">
                     {currentUser?.email || 'Medical User'}
                   </p>
-                  <p className="text-[10px] text-slate-400">
+                  <p className="text-[10px] text-slate-400 font-medium">
                     {isDemoUser ? 'Demo Admin' : 'Firebase Auth'}
                   </p>
                 </div>
@@ -257,3 +380,4 @@ export const Sidebar: React.FC<SidebarProps> = ({
     </>
   );
 };
+

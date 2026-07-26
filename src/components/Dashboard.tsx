@@ -35,9 +35,10 @@ import { HOSPITALS, MEDICAL_CATEGORIES, formatBytes } from '../data/presetData';
 
 interface DashboardProps {
   setActiveTab: (tab: string) => void;
+  setCurrentSubsection?: (sub: 'portal' | 'outsource_database' | 'echocardiogram' | 'holter_schedule' | 'medical_records') => void;
 }
 
-export const Dashboard: React.FC<DashboardProps> = ({ setActiveTab }) => {
+export const Dashboard: React.FC<DashboardProps> = ({ setActiveTab, setCurrentSubsection }) => {
   const { reports, storageStats, setPreviewingReport, toggleClaimedStatus, setFilters } = useReports();
 
   const totalReports = reports.length;
@@ -93,6 +94,77 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveTab }) => {
 
   return (
     <div className="space-y-6">
+
+      {/* Clinical Workspace Subsections Quick Navigation Bar */}
+      {setCurrentSubsection && (
+        <div className="bg-slate-900 text-white rounded-2xl p-5 shadow-sm border border-slate-800 space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-3">
+            <div>
+              <h2 className="text-sm font-extrabold tracking-tight text-white flex items-center gap-2">
+                <Stethoscope className="w-4 h-4 text-indigo-400" />
+                <span>Cardiology Department Services Portal</span>
+              </h2>
+              <p className="text-xs text-slate-400">Directly switch between clinical registries, diagnostic suites, and patient logs</p>
+            </div>
+            <button
+              onClick={() => setCurrentSubsection('portal')}
+              className="self-start sm:self-auto px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition-all border border-slate-700"
+            >
+              ❖ Main Section Portal
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+            {/* Quick Button 1: Temporary Medical Record */}
+            <button
+              onClick={() => setCurrentSubsection('medical_records')}
+              className="flex items-center gap-3 p-3 rounded-xl bg-teal-950/60 hover:bg-teal-900/80 border border-teal-800/60 hover:border-teal-500 text-left transition-all group"
+            >
+              <div className="w-9 h-9 rounded-lg bg-teal-500/20 text-teal-300 flex items-center justify-center shrink-0 group-hover:bg-teal-500 group-hover:text-white transition-colors">
+                <Activity className="w-5 h-5" />
+              </div>
+              <div className="min-w-0">
+                <div className="text-xs font-extrabold text-teal-200 group-hover:text-white truncate">
+                  Temporary Medical Record
+                </div>
+                <div className="text-[10px] text-teal-400/80 truncate">Triage, Clerking &amp; Progress Notes</div>
+              </div>
+            </button>
+
+            {/* Quick Button 2: Echo Suite */}
+            <button
+              onClick={() => setCurrentSubsection('echocardiogram')}
+              className="flex items-center gap-3 p-3 rounded-xl bg-rose-950/60 hover:bg-rose-900/80 border border-rose-800/60 hover:border-rose-500 text-left transition-all group"
+            >
+              <div className="w-9 h-9 rounded-lg bg-rose-500/20 text-rose-300 flex items-center justify-center shrink-0 group-hover:bg-rose-500 group-hover:text-white transition-colors">
+                <Activity className="w-5 h-5" />
+              </div>
+              <div className="min-w-0">
+                <div className="text-xs font-extrabold text-rose-200 group-hover:text-white truncate">
+                  Echocardiogram Suite
+                </div>
+                <div className="text-[10px] text-rose-400/80 truncate">Diastolic Function &amp; Echo Cases</div>
+              </div>
+            </button>
+
+            {/* Quick Button 3: Holter Scheduler */}
+            <button
+              onClick={() => setCurrentSubsection('holter_schedule')}
+              className="flex items-center gap-3 p-3 rounded-xl bg-blue-950/60 hover:bg-blue-900/80 border border-blue-800/60 hover:border-blue-500 text-left transition-all group"
+            >
+              <div className="w-9 h-9 rounded-lg bg-blue-500/20 text-blue-300 flex items-center justify-center shrink-0 group-hover:bg-blue-500 group-hover:text-white transition-colors">
+                <Clock className="w-5 h-5" />
+              </div>
+              <div className="min-w-0">
+                <div className="text-xs font-extrabold text-blue-200 group-hover:text-white truncate">
+                  Cardioscan Holter Schedule
+                </div>
+                <div className="text-[10px] text-blue-400/80 truncate">Patient Appointments &amp; Fleet</div>
+              </div>
+            </button>
+          </div>
+        </div>
+      )}
       
       {/* Metric Cards Banner Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

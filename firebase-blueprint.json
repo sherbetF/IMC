@@ -22,6 +22,51 @@
         "storagePath": { "type": "string" }
       },
       "required": ["fileName", "fileSize", "category", "hospital", "userId"]
+    },
+    "patient_profiles": {
+      "title": "Patient Profiles",
+      "description": "Registered patients in the temporary medical record system",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "idType": { "type": "string" },
+        "idValue": { "type": "string" },
+        "gender": { "type": "string" },
+        "country": { "type": "string" },
+        "currentZone": { "type": "string" },
+        "bedNumber": { "type": "string" },
+        "registeredAt": { "type": "string" },
+        "userId": { "type": "string" },
+        "createdByEmail": { "type": "string" }
+      },
+      "required": ["name", "idType", "idValue", "gender", "currentZone", "userId"]
+    },
+    "clerking_notes": {
+      "title": "Clerking Notes",
+      "description": "Clinical clerking progress notes for patients",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "patientId": { "type": "string" },
+        "progressNote": { "type": "string" },
+        "bedNumber": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "createdBy": { "type": "string" },
+        "status": { "type": "string" },
+        "amendments": { "type": "array" }
+      },
+      "required": ["patientId", "progressNote", "createdBy", "status"]
+    }
+  },
+  "firestore": {
+    "/patient_profiles/{patientId}": {
+      "schema": "patient_profiles",
+      "description": "Primary clinical patient profile database"
+    },
+    "/clerking_notes/{noteId}": {
+      "schema": "clerking_notes",
+      "description": "Clerking entries and progress notes for registered patients"
     }
   }
 }

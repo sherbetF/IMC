@@ -34,6 +34,11 @@ export const PdfPreviewModal: React.FC<PdfPreviewModalProps> = ({ report, onClos
     report.reportDate
   );
 
+  const isPdf = report.fileName.toLowerCase().endsWith('.pdf') || 
+                (report.fileType && report.fileType === 'application/pdf') || 
+                pdfSrc.startsWith('data:application/pdf') ||
+                pdfSrc.includes('.pdf');
+
   const handleDownload = () => {
     if (report.downloadUrl) {
       window.open(report.downloadUrl, '_blank');
@@ -91,17 +96,31 @@ export const PdfPreviewModal: React.FC<PdfPreviewModalProps> = ({ report, onClos
           
           {/* Left Preview Stage */}
           <div className="flex-1 bg-slate-100 p-4 overflow-auto flex items-center justify-center min-h-[350px] md:min-h-[500px]">
-            {pdfSrc.startsWith('data:image/svg+xml') ? (
+            {isPdf ? (
+              <div className="w-full h-full min-h-[480px] flex flex-col space-y-3 justify-between">
+                <iframe
+                  src={pdfSrc}
+                  title="PDF Preview"
+                  className="w-full flex-1 h-[420px] rounded-lg border border-slate-300 shadow-xs bg-white"
+                />
+                <div className="flex flex-col items-center justify-center text-center p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                  <a
+                    href={pdfSrc}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-950 hover:bg-slate-800 text-white text-xs font-bold transition-all shadow-xs min-h-[38px]"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                    <span>Open PDF in New Browser Tab</span>
+                  </a>
+                  <p className="text-[10px] text-slate-400 mt-1">If the PDF fails to render inside the frame, click above to read directly.</p>
+                </div>
+              </div>
+            ) : pdfSrc.startsWith('data:image/svg+xml') ? (
               <img 
                 src={pdfSrc} 
                 alt="Medical Report Preview" 
                 className="max-w-full max-h-[70vh] object-contain shadow-lg rounded-lg border border-slate-300"
-              />
-            ) : pdfSrc.startsWith('data:application/pdf') ? (
-              <iframe
-                src={pdfSrc}
-                title="PDF Preview"
-                className="w-full h-full min-h-[480px] rounded-lg border border-slate-300 shadow-sm"
               />
             ) : (
               <img 
