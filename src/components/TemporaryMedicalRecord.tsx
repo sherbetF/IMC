@@ -27,7 +27,7 @@ import {
   Maximize2
 } from 'lucide-react';
 import { db } from '../lib/firebase';
-import { collection, addDoc, getDocs, doc, updateDoc, query, onSnapshot } from 'firebase/firestore';
+import { collection, addDoc, getDocs, doc, setDoc, updateDoc, query, onSnapshot } from 'firebase/firestore';
 import { useAuth } from '../context/AuthContext';
 import { PatientZone, PatientProfile, ClerkingNote, ClerkingAmendment } from '../types';
 

@@ -970,11 +970,20 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
             </div>
           </div>
 
-          <div className="bg-white/10 backdrop-blur-md rounded-2xl p-3.5 border border-white/10">
-            <p className="text-[10px] uppercase tracking-wider font-extrabold text-indigo-200">Total Logged Transactions</p>
+          <div className={`rounded-2xl p-3.5 border backdrop-blur-md transition-all ${
+            expiringOrExpiredItems.length > 0 
+              ? 'bg-rose-500/20 border-rose-400/40 text-rose-100' 
+              : 'bg-white/10 border-white/10 text-white'
+          }`}>
+            <p className="text-[10px] uppercase tracking-wider font-extrabold text-indigo-200 flex items-center gap-1">
+              {expiringOrExpiredItems.length > 0 && <Clock className="w-3 h-3 text-rose-300 animate-pulse" />}
+              <span>Near Expiring</span>
+            </p>
             <div className="flex items-baseline justify-between mt-1">
-              <span className="text-xl sm:text-2xl font-black font-mono text-purple-300">{transactions.length}</span>
-              <span className="text-[10px] text-indigo-300">Audited</span>
+              <span className={`text-xl sm:text-2xl font-black font-mono ${expiringOrExpiredItems.length > 0 ? 'text-rose-300' : 'text-white'}`}>
+                {expiringOrExpiredItems.length}
+              </span>
+              <span className="text-[10px] text-indigo-200">≤ 60d / Expired</span>
             </div>
           </div>
         </div>

@@ -18,7 +18,7 @@ import {
   ArrowRight
 } from 'lucide-react';
 import { db } from '../lib/firebase';
-import { collection, addDoc, getDocs, deleteDoc, doc, updateDoc, query, where, onSnapshot } from 'firebase/firestore';
+import { collection, addDoc, getDocs, deleteDoc, doc, setDoc, updateDoc, query, where, onSnapshot } from 'firebase/firestore';
 import { useAuth } from '../context/AuthContext';
 import { HolterSchedule, HolterStatus } from '../types';
 
