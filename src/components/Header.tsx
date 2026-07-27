@@ -19,7 +19,7 @@ export const Header: React.FC<HeaderProps> = ({
   setCurrentSubsection
 }) => {
   const { filters, setFilters, storageStats } = useReports();
-  const { isAdmin } = useAuth();
+  const { isAdmin, isGuest } = useAuth();
 
   const getTitle = () => {
     if (currentSubsection === 'echocardiogram') {
@@ -107,15 +107,29 @@ export const Header: React.FC<HeaderProps> = ({
           <div className="relative">
             <select
               value={currentSubsection}
-              onChange={(e) => setCurrentSubsection(e.target.value as any)}
+              onChange={(e) => {
+                const selected = e.target.value as any;
+                if (isGuest && selected !== 'stock_take' && selected !== 'portal') {
+                  return;
+                }
+                setCurrentSubsection(selected);
+              }}
               className="appearance-none bg-slate-100 hover:bg-slate-200/80 text-slate-800 text-xs font-bold py-2 pl-3 pr-8 rounded-xl border border-slate-200 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 cursor-pointer transition-all min-h-[40px]"
             >
-              <option value="outsource_database">📂 Outsource Database</option>
               <option value="stock_take">💉 Stock Management System</option>
-              <option value="medical_records">🏥 Temporary Medical Record (TMR)</option>
-              <option value="echocardiogram">🫀 Echo Suite</option>
-              <option value="holter_schedule">📅 Holter Scheduler</option>
               <option value="portal">❖ Main Portal Menu</option>
+              <option value="outsource_database" disabled={isGuest}>
+                {isGuest ? '📂 Outsource Database (Locked for Guest)' : '📂 Outsource Database'}
+              </option>
+              <option value="medical_records" disabled={isGuest}>
+                {isGuest ? '🏥 Temporary Medical Record (Locked for Guest)' : '🏥 Temporary Medical Record (TMR)'}
+              </option>
+              <option value="echocardiogram" disabled={isGuest}>
+                {isGuest ? '🫀 Echo Suite (Locked for Guest)' : '🫀 Echo Suite'}
+              </option>
+              <option value="holter_schedule" disabled={isGuest}>
+                {isGuest ? '📅 Holter Scheduler (Locked for Guest)' : '📅 Holter Scheduler'}
+              </option>
             </select>
             <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-500">
               <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 20 20">

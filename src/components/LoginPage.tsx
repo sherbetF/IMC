@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
-import { Database, Lock, Mail, ArrowRight, ShieldCheck, FileCheck, CheckCircle2 } from 'lucide-react';
+import { Database, Lock, Mail, ArrowRight, ShieldCheck, UserCheck } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 export const LoginPage: React.FC = () => {
-  const { login, signup, demoLogin } = useAuth();
+  const { login, signup, demoLogin, guestLogin } = useAuth();
   const [isSignUpMode, setIsSignUpMode] = useState<boolean>(false);
-  const [email, setEmail] = useState<string>('doctor@outsourcedb.med');
-  const [password, setPassword] = useState<string>('Outsource2026!');
+  const [email, setEmail] = useState<string>('');
+  const [password, setPassword] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
 
@@ -170,7 +170,7 @@ export const LoginPage: React.FC = () => {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="e.g. doctor@outsourcedb.med"
+                  placeholder="Enter your email address"
                   className="block w-full pl-10 pr-3 py-3 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-600 focus:border-blue-600 text-slate-900 placeholder-slate-400 font-medium"
                 />
               </div>
@@ -214,10 +214,19 @@ export const LoginPage: React.FC = () => {
           </form>
 
           {/* Quick Demo Access Divider */}
-          <div className="mt-6 border-t border-slate-200 pt-5">
+          <div className="mt-6 border-t border-slate-200 pt-5 space-y-2.5">
             <p className="text-center text-xs text-slate-500 font-medium mb-3">
-              Or quickly access with secure admin privileges
+              Or enter instantly with Guest or Demo access
             </p>
+
+            <button
+              type="button"
+              onClick={guestLogin}
+              className="w-full py-3 px-4 rounded-xl border border-indigo-200 bg-indigo-50/80 hover:bg-indigo-100/90 text-indigo-900 text-xs font-bold flex items-center justify-center gap-2 transition-all min-h-[44px] shadow-2xs"
+            >
+              <UserCheck className="w-4 h-4 text-indigo-600" />
+              <span>Guest (Read-Only View)</span>
+            </button>
 
             <button
               type="button"
@@ -227,16 +236,6 @@ export const LoginPage: React.FC = () => {
               <ShieldCheck className="w-4 h-4 text-emerald-600" />
               <span>Instant Admin Demo Mode</span>
             </button>
-          </div>
-
-          <div className="mt-6 bg-slate-50 p-3.5 rounded-xl border border-slate-200/80 text-[11px] text-slate-500 space-y-1">
-            <div className="flex items-center gap-1.5 font-bold text-slate-700">
-              <FileCheck className="w-3.5 h-3.5 text-blue-600" />
-              <span>Hospitals Included:</span>
-            </div>
-            <p>
-              KPJ Dato Onn, KPJ Puteri, KPJ Pasir Gudang, KPJ Johor, Columbia Asia Tebrau, HSA & Hospital Pasir Gudang.
-            </p>
           </div>
 
         </div>

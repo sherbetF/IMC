@@ -43,7 +43,7 @@ const PRESET_PATIENTS: PatientProfile[] = [
     bedNumber: 'Red-01',
     registeredAt: new Date(Date.now() - 3 * 3600 * 1000).toISOString(), // 3 hours ago
     userId: 'system',
-    createdByEmail: 'doctor@outsourcedb.med'
+    createdByEmail: 'staff@clinic.med'
   },
   {
     id: 'preset-p2',
@@ -56,7 +56,7 @@ const PRESET_PATIENTS: PatientProfile[] = [
     bedNumber: 'Yellow-04',
     registeredAt: new Date(Date.now() - 5 * 3600 * 1000).toISOString(), // 5 hours ago
     userId: 'system',
-    createdByEmail: 'doctor@outsourcedb.med'
+    createdByEmail: 'staff@clinic.med'
   },
   {
     id: 'preset-p3',
@@ -68,7 +68,7 @@ const PRESET_PATIENTS: PatientProfile[] = [
     bedNumber: 'Green-09',
     registeredAt: new Date(Date.now() - 8 * 3600 * 1000).toISOString(), // 8 hours ago
     userId: 'system',
-    createdByEmail: 'doctor@outsourcedb.med'
+    createdByEmail: 'staff@clinic.med'
   },
   {
     id: 'preset-p4',
@@ -81,7 +81,7 @@ const PRESET_PATIENTS: PatientProfile[] = [
     bedNumber: 'Discharged-T01',
     registeredAt: new Date(Date.now() - 24 * 3600 * 1000).toISOString(), // 1 day ago
     userId: 'system',
-    createdByEmail: 'doctor@outsourcedb.med'
+    createdByEmail: 'staff@clinic.med'
   }
 ];
 
@@ -92,7 +92,7 @@ const PRESET_CLERKING_NOTES: ClerkingNote[] = [
     progressNote: 'Patient presented with severe crushing retrosternal chest pain radiating to the left shoulder, associated with diaphoresis and nausea. ECG shows ST-segment elevation in V1-V4 (Anterior STEMI). Administered dual antiplatelet therapy (DAPT): Aspirin 300mg and Clopidogrel 300mg. Initiated oxygen therapy and continuous cardiac monitoring. Cardiology team activated for immediate primary PCI transfer.',
     bedNumber: 'Red-01',
     createdAt: new Date(Date.now() - 2.8 * 3600 * 1000).toISOString(),
-    createdBy: 'doctor@outsourcedb.med',
+    createdBy: 'staff@clinic.med',
     status: 'active',
     amendments: []
   },
@@ -102,7 +102,7 @@ const PRESET_CLERKING_NOTES: ClerkingNote[] = [
     progressNote: 'Presented with high-grade fever (39.1°C), productive cough, and progressive shortness of breath for 3 days. Chest X-Ray confirms dense consolidation in the right lower lobe. SpO2 is 95% on room air. Formulated diagnosis of Community-Acquired Pneumonia (CAP). Started IV Ceftriaxone 1g OD and Oral Azithromycin 500mg OD. Blood cultures and sputum microscopy sent. Monitor temperature and SpO2 closely.',
     bedNumber: 'Yellow-04',
     createdAt: new Date(Date.now() - 4.5 * 3600 * 1000).toISOString(),
-    createdBy: 'doctor@outsourcedb.med',
+    createdBy: 'staff@clinic.med',
     status: 'active',
     amendments: []
   },
@@ -112,7 +112,7 @@ const PRESET_CLERKING_NOTES: ClerkingNote[] = [
     progressNote: 'Presented with minor laceration on the left lateral forearm from a glass break incident. Cleaned, explored, and irrigated with normal saline. No major tendon, nerve, or vascular involvement. Wound sutured with 4-0 Ethilon (5 simple interrupted sutures). Tetanus toxoid booster 0.5ml IM given. Advised on daily dressing changes, dry wound hygiene, and suture removal in 7 days.',
     bedNumber: 'Green-09',
     createdAt: new Date(Date.now() - 7.5 * 3600 * 1000).toISOString(),
-    createdBy: 'doctor@outsourcedb.med',
+    createdBy: 'staff@clinic.med',
     status: 'active',
     amendments: []
   },
@@ -122,7 +122,7 @@ const PRESET_CLERKING_NOTES: ClerkingNote[] = [
     progressNote: '81-year-old gentleman who sustained a mechanical fall at home. Left hip pain with complete inability to bear weight. X-ray confirmed displaced left neck of femur (NOF) fracture. Patient is medically stable but requires urgent surgical intervention. Case discussed with orthopedic registrar. Arranged official patient transfer to Tertiary Hospital Orthopedic ward via dedicated medical ambulance.',
     bedNumber: 'Discharged-T01',
     createdAt: new Date(Date.now() - 23 * 3600 * 1000).toISOString(),
-    createdBy: 'doctor@outsourcedb.med',
+    createdBy: 'staff@clinic.med',
     status: 'active',
     amendments: [
       {
@@ -130,7 +130,7 @@ const PRESET_CLERKING_NOTES: ClerkingNote[] = [
         note: 'Orthopedic bed at Tertiary Hospital was officially confirmed at 11:30 AM. Ambulance dispatch scheduled for 1:00 PM.',
         bedNumber: 'Discharged-T01',
         amendedAt: new Date(Date.now() - 22 * 3600 * 1000).toISOString(),
-        amendedBy: 'doctor@outsourcedb.med'
+        amendedBy: 'staff@clinic.med'
       }
     ]
   }
@@ -395,7 +395,7 @@ export const TemporaryMedicalRecord: React.FC<TemporaryMedicalRecordProps> = ({ 
     }
 
     const uniqueId = `patient-${Date.now()}`;
-    const userEmail = currentUser?.email || 'doctor@outsourcedb.med';
+    const userEmail = currentUser?.email || 'staff@clinic.med';
 
     const newPatient: Omit<PatientProfile, 'id'> = {
       name: regName.trim(),
@@ -469,7 +469,7 @@ export const TemporaryMedicalRecord: React.FC<TemporaryMedicalRecordProps> = ({ 
       return;
     }
 
-    const userEmail = currentUser?.email || 'doctor@outsourcedb.med';
+    const userEmail = currentUser?.email || 'staff@clinic.med';
     const noteId = `note-${Date.now()}`;
 
     const newNote: Omit<ClerkingNote, 'id'> = {
@@ -500,7 +500,7 @@ export const TemporaryMedicalRecord: React.FC<TemporaryMedicalRecordProps> = ({ 
   // Actions: Amend Note
   const handleAmendNote = async (noteId: string) => {
     if (!amendText.trim()) return;
-    const userEmail = currentUser?.email || 'doctor@outsourcedb.med';
+    const userEmail = currentUser?.email || 'staff@clinic.med';
 
     const newAmendment: ClerkingAmendment = {
       id: `amend-${Date.now()}`,
@@ -767,7 +767,7 @@ export const TemporaryMedicalRecord: React.FC<TemporaryMedicalRecordProps> = ({ 
                         <div className="space-y-1">
                           <span className="text-[11px] font-bold text-slate-500 uppercase block">Authorized Clinician</span>
                           <div className="px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 font-bold truncate min-h-[42px] flex items-center">
-                            {currentUser?.email || 'doctor@outsourcedb.med'}
+                            {currentUser?.email || 'staff@clinic.med'}
                           </div>
                         </div>
                       </div>

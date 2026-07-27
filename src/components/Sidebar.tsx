@@ -50,7 +50,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   currentSubsection,
   setCurrentSubsection
 }) => {
-  const { currentUser, logout, isDemoUser, isAdmin } = useAuth();
+  const { currentUser, logout, isDemoUser, isGuest, isAdmin } = useAuth();
   const { storageStats } = useReports();
   const [internalCollapsed, setInternalCollapsed] = useState<boolean>(false);
 
@@ -352,15 +352,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <div className={`pt-1 flex items-center ${collapsed ? 'lg:justify-center' : 'justify-between'}`}>
             {!collapsed && (
               <div className="flex items-center space-x-2.5 overflow-hidden">
-                <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-xs font-bold text-slate-200 shrink-0">
-                  {currentUser?.email ? currentUser.email[0].toUpperCase() : 'M'}
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${isGuest ? 'bg-indigo-700 text-indigo-100' : 'bg-slate-700 text-slate-200'}`}>
+                  {isGuest ? 'G' : (currentUser?.email ? currentUser.email[0].toUpperCase() : 'M')}
                 </div>
                 <div className="truncate">
                   <p className="text-xs font-semibold text-white truncate max-w-[110px]">
-                    {currentUser?.email || 'Medical User'}
+                    {isGuest ? 'Guest User' : (currentUser?.email || 'Medical User')}
                   </p>
                   <p className="text-[10px] text-slate-400 font-medium">
-                    {isDemoUser ? 'Demo Admin' : 'Firebase Auth'}
+                    {isGuest ? 'Guest (Read-Only)' : (isDemoUser ? 'Demo Admin' : 'Firebase Auth')}
                   </p>
                 </div>
               </div>

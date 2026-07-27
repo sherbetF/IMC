@@ -20,7 +20,9 @@ interface AuthContextType {
   signup: (email: string, pass: string) => Promise<void>;
   logout: () => Promise<void>;
   demoLogin: () => void;
+  guestLogin: () => void;
   isDemoUser: boolean;
+  isGuest: boolean;
   isAdmin: boolean;
 }
 
@@ -30,6 +32,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [isDemoUser, setIsDemoUser] = useState<boolean>(false);
+  const [isGuest, setIsGuest] = useState<boolean>(false);
 
   useEffect(() => {
     // Set persistence to browserSessionPersistence to avoid persisting across different window sessions
@@ -41,12 +44,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const sessionActive = sessionStorage.getItem('logged_in_session');
     if (!sessionActive) {
       sessionStorage.removeItem('outsource_db_demo_user');
+      sessionStorage.removeItem('outsource_db_guest_user');
       firebaseSignOut(auth).then(() => {
         setCurrentUser(null);
         setLoading(false);
       }).catch(() => {
         setLoading(false);
       });
+      return;
+    }
+
+    // Check if guest session exists in sessionStorage
+    const savedGuest = sessionStorage.getItem('outsource_db_guest_user');
+    if (savedGuest === 'true') {
+      setIsGuest(true);
+      setCurrentUser({
+        uid: 'guest-user-uid',
+        email: 'guest@outsourcedb.med',
+        displayName: 'Guest User',
+        emailVerified: true,
+        isAnonymous: true,
+        metadata: {},
+        providerData: [],
+        refreshToken: '',
+        tenantId: null,
+        delete: async () => {},
+        getIdToken: async () => 'guest-token',
+        getIdTokenResult: async () => ({} as any),
+        reload: async () => {},
+        toJSON: () => ({})
+      } as unknown as User);
+      setLoading(false);
       return;
     }
 
@@ -77,6 +105,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user && !user.isAnonymous) {
         setIsDemoUser(false);
+        setIsGuest(false);
         setCurrentUser(user);
       } else {
         setCurrentUser(user);
@@ -89,23 +118,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const login = async (email: string, pass: string) => {
     setIsDemoUser(false);
+    setIsGuest(false);
     sessionStorage.removeItem('outsource_db_demo_user');
+    sessionStorage.removeItem('outsource_db_guest_user');
     await signInWithEmailAndPassword(auth, email.trim(), pass);
     sessionStorage.setItem('logged_in_session', 'true');
   };
 
   const signup = async (email: string, pass: string) => {
     setIsDemoUser(false);
+    setIsGuest(false);
     sessionStorage.removeItem('outsource_db_demo_user');
+    sessionStorage.removeItem('outsource_db_guest_user');
     await createUserWithEmailAndPassword(auth, email.trim(), pass);
     sessionStorage.setItem('logged_in_session', 'true');
   };
 
   const logout = async () => {
     sessionStorage.removeItem('logged_in_session');
-    if (isDemoUser) {
+    sessionStorage.removeItem('outsource_db_demo_user');
+    sessionStorage.removeItem('outsource_db_guest_user');
+    if (isDemoUser || isGuest) {
       setIsDemoUser(false);
-      sessionStorage.removeItem('outsource_db_demo_user');
+      setIsGuest(false);
       setCurrentUser(null);
       return;
     }
@@ -114,6 +149,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const demoLogin = () => {
     setIsDemoUser(true);
+    setIsGuest(false);
+    sessionStorage.removeItem('outsource_db_guest_user');
     sessionStorage.setItem('outsource_db_demo_user', 'true');
     sessionStorage.setItem('logged_in_session', 'true');
     setCurrentUser({
@@ -134,10 +171,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } as unknown as User);
   };
 
-  const isAdmin = isDemoUser || !!(currentUser && !currentUser.isAnonymous) || currentUser?.uid === ADMIN_UID;
+  const guestLogin = () => {
+    setIsGuest(true);
+    setIsDemoUser(false);
+    sessionStorage.removeItem('outsource_db_demo_user');
+    sessionStorage.setItem('outsource_db_guest_user', 'true');
+    sessionStorage.setItem('logged_in_session', 'true');
+    setCurrentUser({
+      uid: 'guest-user-uid',
+      email: 'guest@outsourcedb.med',
+      displayName: 'Guest User',
+      emailVerified: true,
+      isAnonymous: true,
+      metadata: {},
+      providerData: [],
+      refreshToken: '',
+      tenantId: null,
+      delete: async () => {},
+      getIdToken: async () => 'guest-token',
+      getIdTokenResult: async () => ({} as any),
+      reload: async () => {},
+      toJSON: () => ({})
+    } as unknown as User);
+  };
+
+  const isAdmin = !isGuest && (isDemoUser || !!(currentUser && !currentUser.isAnonymous) || currentUser?.uid === ADMIN_UID);
 
   return (
-    <AuthContext.Provider value={{ currentUser, loading, login, signup, logout, demoLogin, isDemoUser, isAdmin }}>
+    <AuthContext.Provider value={{ currentUser, loading, login, signup, logout, demoLogin, guestLogin, isDemoUser, isGuest, isAdmin }}>
       {children}
     </AuthContext.Provider>
   );

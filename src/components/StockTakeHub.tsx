@@ -33,7 +33,8 @@ import {
   Calendar,
   Clock,
   AlertCircle,
-  ArrowLeftRight
+  ArrowLeftRight,
+  Eye
 } from 'lucide-react';
 import { StockItem, StockTransaction, StockItemCategory, StockActionType, StockBatch } from '../types';
 import { useAuth } from '../context/AuthContext';
@@ -267,7 +268,7 @@ interface StockTakeHubProps {
 }
 
 export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActiveTab }) => {
-  const { currentUser } = useAuth();
+  const { currentUser, isGuest } = useAuth();
 
   // Track deleted items to prevent Firestore real-time snapshot sync overrides
   const deletedItemIdsRef = React.useRef<Set<string>>(new Set());
@@ -410,7 +411,7 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
 
   // Active View State & Layout Mode
   const [viewMode, setViewMode] = useState<'inventory' | 'register' | 'logs' | 'summary'>('inventory');
-  const [inventoryLayout, setInventoryLayout] = useState<'grid' | 'list'>('grid'); // 'grid' (Big Box) vs 'list' (List View)
+  const [inventoryLayout, setInventoryLayout] = useState<'grid' | 'list'>('list'); // Default to 'list' (List View)
 
   // Sync incoming activeTab with viewMode
   useEffect(() => {
@@ -421,6 +422,9 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
   }, [activeTab]);
 
   const handleSetViewMode = (mode: 'inventory' | 'register' | 'logs' | 'summary') => {
+    if (isGuest && mode === 'register') {
+      return;
+    }
     setViewMode(mode);
     if (setActiveTab) {
       if (mode === 'inventory') setActiveTab('stock_inventory');
@@ -444,7 +448,7 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
   const [adjustStore, setAdjustStore] = useState<'IMC' | 'PPD'>('IMC');
   const [adjustQuantity, setAdjustQuantity] = useState<number | ''>(10);
   const [adjustDestination, setAdjustDestination] = useState<string>('');
-  const [adjustStaffName, setAdjustStaffName] = useState<string>(currentUser?.email?.split('@')[0] || 'MA Shafiq');
+  const [adjustStaffName, setAdjustStaffName] = useState<string>('');
   const [adjustNotes, setAdjustNotes] = useState<string>('');
 
   // Stock Adjustment Batch Options State
@@ -510,14 +514,14 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
 
   // New Item Form State
   const [newItemName, setNewItemName] = useState<string>('');
-  const [newItemCategory, setNewItemCategory] = useState<StockItemCategory>('Blood Collection Tubes');
-  const [newItemIndentFrom, setNewItemIndentFrom] = useState<string>('HSA Store Utama');
-  const [newItemImcStock, setNewItemImcStock] = useState<number | ''>(100);
-  const [newItemPpdStock, setNewItemPpdStock] = useState<number | ''>(0);
-  const [newItemUnit, setNewItemUnit] = useState<string>('pcs');
-  const [newItemPrice, setNewItemPrice] = useState<number | ''>(1.50);
-  const [newItemLocation, setNewItemLocation] = useState<string>('Cabinet A - Shelf 1');
-  const [newItemThreshold, setNewItemThreshold] = useState<number | ''>(30);
+  const [newItemCategory, setNewItemCategory] = useState<StockItemCategory | ''>('');
+  const [newItemIndentFrom, setNewItemIndentFrom] = useState<string>('');
+  const [newItemImcStock, setNewItemImcStock] = useState<number | ''>('');
+  const [newItemPpdStock, setNewItemPpdStock] = useState<number | ''>('');
+  const [newItemUnit, setNewItemUnit] = useState<string>('');
+  const [newItemPrice, setNewItemPrice] = useState<number | ''>('');
+  const [newItemLocation, setNewItemLocation] = useState<string>('');
+  const [newItemThreshold, setNewItemThreshold] = useState<number | ''>('');
   const [newItemExpiryDate, setNewItemExpiryDate] = useState<string>(() => {
     const d = new Date();
     d.setFullYear(d.getFullYear() + 1);
@@ -639,16 +643,31 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
       return;
     }
 
+    if (!newItemCategory) {
+      alert('Please select a Type / Category.');
+      return;
+    }
+
+    if (!newItemIndentFrom) {
+      alert('Please select an Indent From supplier.');
+      return;
+    }
+
+    if (!newItemUnit) {
+      alert('Please select a Unit.');
+      return;
+    }
+
     if (!newItemExpiryDate) {
       alert('Please select an expiry date for this stock item.');
       return;
     }
 
-    const imcQty = typeof newItemImcStock === 'number' ? newItemImcStock : 0;
-    const ppdQty = typeof newItemPpdStock === 'number' ? newItemPpdStock : 0;
+    const imcQty = typeof newItemImcStock === 'number' && !isNaN(newItemImcStock) ? newItemImcStock : 0;
+    const ppdQty = typeof newItemPpdStock === 'number' && !isNaN(newItemPpdStock) ? newItemPpdStock : 0;
     const stockQty = imcQty + ppdQty;
-    const price = typeof newItemPrice === 'number' ? newItemPrice : 0;
-    const threshold = typeof newItemThreshold === 'number' ? newItemThreshold : 20;
+    const price = typeof newItemPrice === 'number' && !isNaN(newItemPrice) ? newItemPrice : 0;
+    const threshold = typeof newItemThreshold === 'number' && !isNaN(newItemThreshold) ? newItemThreshold : 20;
 
     const initialBatch: StockBatch = {
       id: `b-${Date.now()}`,
@@ -662,14 +681,14 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
     const newItem: StockItem = {
       id: `stk-${Date.now()}`,
       name: newItemName.trim(),
-      type: newItemCategory,
-      indentFrom: newItemIndentFrom.trim() || 'Store Utama IMC',
+      type: newItemCategory as StockItemCategory,
+      indentFrom: newItemIndentFrom.trim() || 'Store Pharmacy',
       currentStock: stockQty,
       imcStock: imcQty,
       ppdStock: ppdQty,
-      unit: newItemUnit.trim() || 'pcs',
+      unit: newItemUnit.trim() || 'Pcs',
       pricePerUnit: price,
-      locationStored: newItemLocation.trim() || 'Venepuncture Desk',
+      locationStored: newItemLocation.trim() || 'General Store',
       warningThreshold: threshold,
       expiryDate: newItemExpiryDate,
       batches: [initialBatch],
@@ -702,11 +721,17 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
 
     // Reset Form
     setNewItemName('');
-    setNewItemImcStock(100);
-    setNewItemPpdStock(0);
-    setNewItemPrice(1.50);
+    setNewItemCategory('' as StockItemCategory);
+    setNewItemIndentFrom('');
+    setNewItemImcStock('');
+    setNewItemPpdStock('');
+    setNewItemUnit('');
+    setNewItemPrice('');
+    setNewItemLocation('');
+    setNewItemThreshold('');
     setNewItemNotes('');
     setNewItemImage('');
+    handleSetViewMode('inventory');
     handleSetViewMode('inventory');
   };
 
@@ -919,7 +944,7 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
       stockBefore: managingBatchesItem.currentStock,
       stockAfter: updatedItem.currentStock,
       destinationOrSource: `New Lot Added: ${lotNum} (Exp: ${newBatchExpiryDate})`,
-      staffName: currentUser?.email?.split('@')[0] || 'MA Shafiq',
+      staffName: currentUser?.email?.split('@')[0] || 'Staff',
       notes: `Batch ${lotNum} registered with expiry ${newBatchExpiryDate}`,
       timestamp: new Date().toISOString()
     };
@@ -978,6 +1003,20 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
 
   return (
     <div className="space-y-6">
+      {/* Guest Mode Notice Banner */}
+      {isGuest && (
+        <div className="bg-indigo-50/90 border border-indigo-200/90 rounded-2xl p-4 text-xs font-bold text-indigo-900 flex items-center justify-between shadow-2xs">
+          <div className="flex items-center gap-2.5">
+            <Eye className="w-4 h-4 text-indigo-600 shrink-0" />
+            <span>
+              <strong>Guest Mode Active (View-Only):</strong> You can inspect stock inventory, search, filter, and review logs. Adding, editing, adjusting, or deleting stock items is disabled.
+            </span>
+          </div>
+          <span className="bg-indigo-200/80 text-indigo-800 text-[10px] px-2.5 py-1 rounded-full uppercase font-black shrink-0">
+            Read Only
+          </span>
+        </div>
+      )}
       
       {/* Top Banner Header */}
       <div className="bg-gradient-to-r from-violet-900 via-indigo-900 to-slate-900 text-white rounded-3xl p-6 sm:p-8 shadow-xl border border-indigo-950 relative overflow-hidden">
@@ -992,27 +1031,34 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
               Stock Management System
             </h2>
             <p className="text-xs sm:text-sm text-indigo-200/80 max-w-2xl leading-relaxed">
-              Track blood tubes, butterfly needles, lancets, and consumables. Monitor indent suppliers, issue stock , set custom alert thresholds, and audit stock log histories
+              Track blood tubes, butterfly needles, lancets, and consumables. Monitor indent suppliers, issue stock, set custom alert thresholds, and audit stock log histories
             </p>
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
-            <button
-              onClick={() => handleSetViewMode(viewMode === 'register' ? 'inventory' : 'register')}
-              className="px-4 py-2.5 rounded-xl bg-violet-500 hover:bg-violet-400 text-white text-xs font-bold transition-all shadow-md flex items-center gap-1.5 min-h-[42px]"
-            >
-              {viewMode === 'register' ? (
-                <>
-                  <Package className="w-4 h-4" />
-                  <span>Back to Inventory</span>
-                </>
-              ) : (
-                <>
-                  <PlusCircle className="w-4 h-4" />
-                  <span>Register New Item</span>
-                </>
-              )}
-            </button>
+            {isGuest ? (
+              <span className="px-4 py-2.5 rounded-xl bg-violet-950/80 border border-violet-800/80 text-violet-200 text-xs font-bold flex items-center gap-2 min-h-[42px]">
+                <Eye className="w-4 h-4 text-violet-400" />
+                <span>Guest Mode (View Only)</span>
+              </span>
+            ) : (
+              <button
+                onClick={() => handleSetViewMode(viewMode === 'register' ? 'inventory' : 'register')}
+                className="px-4 py-2.5 rounded-xl bg-violet-500 hover:bg-violet-400 text-white text-xs font-bold transition-all shadow-md flex items-center gap-1.5 min-h-[42px]"
+              >
+                {viewMode === 'register' ? (
+                  <>
+                    <Package className="w-4 h-4" />
+                    <span>Back to Inventory</span>
+                  </>
+                ) : (
+                  <>
+                    <PlusCircle className="w-4 h-4" />
+                    <span>Register New Item</span>
+                  </>
+                )}
+              </button>
+            )}
           </div>
         </div>
 
@@ -1419,16 +1465,18 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
                             <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Warning Limit</p>
                             <div className="flex items-center gap-1 justify-end mt-0.5">
                               <span className="text-xs font-extrabold font-mono text-slate-700">≤ {item.warningThreshold} {item.unit}</span>
-                              <button
-                                onClick={() => {
-                                  setThresholdItem(item);
-                                  setNewThresholdValue(item.warningThreshold);
-                                }}
-                                className="p-1 text-violet-600 hover:bg-violet-100 rounded-md transition-colors"
-                                title="Adjust warning threshold limit"
-                              >
-                                <Edit3 className="w-3 h-3" />
-                              </button>
+                              {!isGuest && (
+                                <button
+                                  onClick={() => {
+                                    setThresholdItem(item);
+                                    setNewThresholdValue(item.warningThreshold);
+                                  }}
+                                  className="p-1 text-violet-600 hover:bg-violet-100 rounded-md transition-colors"
+                                  title="Adjust warning threshold limit"
+                                >
+                                  <Edit3 className="w-3 h-3" />
+                                </button>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -1520,39 +1568,48 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
                     </div>
 
                     {/* Action Buttons: Add/Remove Stock & Delete */}
-                    <div className="mt-4 pt-3 border-t border-slate-100 flex items-center gap-2">
-                      <button
-                        onClick={() => {
-                          setStockAdjustItem(item);
-                          setAdjustAction('ADD');
-                          setAdjustQuantity(20);
-                        }}
-                        className="flex-1 py-2 px-3 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-bold transition-all flex items-center justify-center gap-1 min-h-[36px]"
-                      >
-                        <PlusCircle className="w-3.5 h-3.5 text-emerald-600" />
-                        <span>Add Stock</span>
-                      </button>
+                    {isGuest ? (
+                      <div className="mt-4 pt-3 border-t border-slate-100 text-center">
+                        <span className="text-[11px] font-bold text-slate-400 bg-slate-100 px-3 py-1.5 rounded-lg inline-flex items-center gap-1.5 w-full justify-center">
+                          <Eye className="w-3.5 h-3.5 text-slate-400" />
+                          Read-Only View (Guest Mode)
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="mt-4 pt-3 border-t border-slate-100 flex items-center gap-2">
+                        <button
+                          onClick={() => {
+                            setStockAdjustItem(item);
+                            setAdjustAction('ADD');
+                            setAdjustQuantity(20);
+                          }}
+                          className="flex-1 py-2 px-3 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-bold transition-all flex items-center justify-center gap-1 min-h-[36px]"
+                        >
+                          <PlusCircle className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>Add Stock</span>
+                        </button>
 
-                      <button
-                        onClick={() => {
-                          setStockAdjustItem(item);
-                          setAdjustAction('REMOVE');
-                          setAdjustQuantity(10);
-                        }}
-                        className="flex-1 py-2 px-3 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-200 text-xs font-bold transition-all flex items-center justify-center gap-1 min-h-[36px]"
-                      >
-                        <MinusCircle className="w-3.5 h-3.5 text-rose-600" />
-                        <span>Issue Stock</span>
-                      </button>
+                        <button
+                          onClick={() => {
+                            setStockAdjustItem(item);
+                            setAdjustAction('REMOVE');
+                            setAdjustQuantity(10);
+                          }}
+                          className="flex-1 py-2 px-3 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-200 text-xs font-bold transition-all flex items-center justify-center gap-1 min-h-[36px]"
+                        >
+                          <MinusCircle className="w-3.5 h-3.5 text-rose-600" />
+                          <span>Issue Stock</span>
+                        </button>
 
-                      <button
-                        onClick={() => setDeletingItemId(item.id)}
-                        className="p-2 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
-                        title="Delete Item"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
+                        <button
+                          onClick={() => setDeletingItemId(item.id)}
+                          className="p-2 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                          title="Delete Item"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -1707,39 +1764,45 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
 
                           {/* Column 7: Actions */}
                           <td className="py-3 px-4 text-center">
-                            <div className="flex items-center justify-center gap-1">
-                              <button
-                                onClick={() => {
-                                  setStockAdjustItem(item);
-                                  setAdjustAction('ADD');
-                                  setAdjustQuantity(20);
-                                }}
-                                className="p-1.5 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200"
-                                title="Add Stock"
-                              >
-                                <PlusCircle className="w-4 h-4" />
-                              </button>
+                            {isGuest ? (
+                              <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-1 rounded">
+                                View Only
+                              </span>
+                            ) : (
+                              <div className="flex items-center justify-center gap-1">
+                                <button
+                                  onClick={() => {
+                                    setStockAdjustItem(item);
+                                    setAdjustAction('ADD');
+                                    setAdjustQuantity(20);
+                                  }}
+                                  className="p-1.5 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200"
+                                  title="Add Stock"
+                                >
+                                  <PlusCircle className="w-4 h-4" />
+                                </button>
 
-                              <button
-                                onClick={() => {
-                                  setStockAdjustItem(item);
-                                  setAdjustAction('REMOVE');
-                                  setAdjustQuantity(10);
-                                }}
-                                className="p-1.5 rounded-lg bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200"
-                                title="Issue Stock"
-                              >
-                                <MinusCircle className="w-4 h-4" />
-                              </button>
+                                <button
+                                  onClick={() => {
+                                    setStockAdjustItem(item);
+                                    setAdjustAction('REMOVE');
+                                    setAdjustQuantity(10);
+                                  }}
+                                  className="p-1.5 rounded-lg bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200"
+                                  title="Issue Stock"
+                                >
+                                  <MinusCircle className="w-4 h-4" />
+                                </button>
 
-                              <button
-                                onClick={() => setDeletingItemId(item.id)}
-                                className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50"
-                                title="Delete Item"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </div>
+                                <button
+                                  onClick={() => setDeletingItemId(item.id)}
+                                  className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50"
+                                  title="Delete Item"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            )}
                           </td>
                         </tr>
                       );
@@ -1761,7 +1824,7 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
             <div>
               <h3 className="text-lg font-black text-slate-900 flex items-center gap-2 font-futuristic">
                 <PlusCircle className="w-5 h-5 text-violet-600" />
-                Register New Venepuncture Hub Item
+                Register New Hub Item
               </h3>
               <p className="text-xs text-slate-500 mt-1">
                 Enter technical item specifications, indent source, price in RM, photo, and custom warning threshold.
@@ -1799,10 +1862,12 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
                   Type / Category *
                 </label>
                 <select
+                  required
                   value={newItemCategory}
                   onChange={(e) => setNewItemCategory(e.target.value as StockItemCategory)}
-                  className="w-full px-3.5 py-2.5 text-xs font-bold border border-slate-300 rounded-xl focus:ring-2 focus:ring-violet-500 bg-slate-50/30"
+                  className="w-full px-3.5 py-2.5 text-xs font-bold border border-slate-300 rounded-xl focus:ring-2 focus:ring-violet-500 bg-slate-50/30 text-slate-800"
                 >
+                  <option value="" disabled>-- Select Category --</option>
                   {CATEGORIES.map(cat => (
                     <option key={cat} value={cat}>{cat}</option>
                   ))}
@@ -1814,14 +1879,17 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide">
                   Indent From (Supplier/Store) *
                 </label>
-                <input
-                  type="text"
+                <select
                   required
-                  placeholder="e.g. HSA Central Store Utama, KPJ Store, Medivest"
                   value={newItemIndentFrom}
                   onChange={(e) => setNewItemIndentFrom(e.target.value)}
-                  className="w-full px-3.5 py-2.5 text-xs font-medium border border-slate-300 rounded-xl focus:ring-2 focus:ring-violet-500 bg-slate-50/30"
-                />
+                  className="w-full px-3.5 py-2.5 text-xs font-bold border border-slate-300 rounded-xl focus:ring-2 focus:ring-violet-500 bg-slate-50/30 text-slate-800"
+                >
+                  <option value="" disabled>-- Select Supplier / Store --</option>
+                  <option value="Store Pharmacy">Store Pharmacy</option>
+                  <option value="Terumo">Terumo</option>
+                  <option value="Skintact">Skintact</option>
+                </select>
               </div>
 
               {/* Initial Current Stock split into 2 stores */}
@@ -1861,25 +1929,27 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide">
                   Unit *
                 </label>
-                <input
-                  type="text"
+                <select
                   required
-                  placeholder="e.g. pcs, boxes (100s), packs, bottles"
                   value={newItemUnit}
                   onChange={(e) => setNewItemUnit(e.target.value)}
-                  className="w-full px-3.5 py-2.5 text-xs font-medium border border-slate-300 rounded-xl focus:ring-2 focus:ring-violet-500 bg-slate-50/30"
-                />
+                  className="w-full px-3.5 py-2.5 text-xs font-bold border border-slate-300 rounded-xl focus:ring-2 focus:ring-violet-500 bg-slate-50/30 text-slate-800"
+                >
+                  <option value="" disabled>-- Select Unit --</option>
+                  <option value="Pcs">Pcs</option>
+                  <option value="Box">Box</option>
+                  <option value="Packs">Packs</option>
+                </select>
               </div>
 
-              {/* Unit Price (RM) */}
+              {/* Unit Price (RM) - Non mandatory */}
               <div className="space-y-1">
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide">
-                  Price Per Item (RM) *
+                  Price Per Item (RM) <span className="text-slate-400 font-normal text-[10px] lowercase">(optional)</span>
                 </label>
                 <input
                   type="number"
                   step="0.01"
-                  required
                   placeholder="e.g. 0.85"
                   value={newItemPrice}
                   onChange={(e) => setNewItemPrice(e.target.value === '' ? '' : parseFloat(e.target.value))}
@@ -1887,14 +1957,13 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
                 />
               </div>
 
-              {/* Location Stored */}
+              {/* Location Stored - Non mandatory */}
               <div className="space-y-1">
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide">
-                  Location Stored *
+                  Location Stored <span className="text-slate-400 font-normal text-[10px] lowercase">(optional)</span>
                 </label>
                 <input
                   type="text"
-                  required
                   placeholder="e.g. Cabinet A - Shelf 2, Trolley 1"
                   value={newItemLocation}
                   onChange={(e) => setNewItemLocation(e.target.value)}
