@@ -269,7 +269,7 @@ interface StockTakeHubProps {
 }
 
 export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActiveTab }) => {
-  const { currentUser, isGuest } = useAuth();
+  const { currentUser, isGuest, isAdmin } = useAuth();
 
   // Track deleted items to prevent Firestore real-time snapshot sync overrides
   const deletedItemIdsRef = React.useRef<Set<string>>(new Set());
@@ -411,7 +411,7 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
   }, []);
 
   // Active View State & Layout Mode
-  const [viewMode, setViewMode] = useState<'inventory' | 'register' | 'logs' | 'summary'>('inventory');
+  const [viewMode, setViewMode] = useState<'inventory' | 'register' | 'logs' | 'summary' | 'edit'>('inventory');
   const [inventoryLayout, setInventoryLayout] = useState<'grid' | 'list'>('list'); // Default to 'list' (List View)
 
   // Sync incoming activeTab with viewMode
@@ -422,8 +422,8 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
     else if (activeTab === 'stock_summary') setViewMode('summary');
   }, [activeTab]);
 
-  const handleSetViewMode = (mode: 'inventory' | 'register' | 'logs' | 'summary') => {
-    if (isGuest && mode === 'register') {
+  const handleSetViewMode = (mode: 'inventory' | 'register' | 'logs' | 'summary' | 'edit') => {
+    if (isGuest && (mode === 'register' || mode === 'edit')) {
       return;
     }
     setViewMode(mode);
@@ -451,6 +451,13 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
   const [adjustDestination, setAdjustDestination] = useState<string>('');
   const [adjustStaffName, setAdjustStaffName] = useState<string>('');
   const [adjustNotes, setAdjustNotes] = useState<string>('');
+
+  // Sync stock adjustment store location with selected store filter automatically
+  useEffect(() => {
+    if (stockAdjustItem && selectedStoreFilter !== 'ALL') {
+      setAdjustStore(selectedStoreFilter);
+    }
+  }, [stockAdjustItem, selectedStoreFilter]);
 
   // Stock Adjustment Batch Options State
   const [adjustBatchMode, setAdjustBatchMode] = useState<'NEW_BATCH' | 'EXISTING_BATCH'>('NEW_BATCH');
@@ -512,6 +519,9 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
   // Edit Expiry Modal State
   const [editingExpiryItem, setEditingExpiryItem] = useState<StockItem | null>(null);
   const [editExpiryValue, setEditExpiryValue] = useState<string>('');
+
+  // Edit Item State
+  const [editingItem, setEditingItem] = useState<StockItem | null>(null);
 
   // New Item Form State
   const [newItemName, setNewItemName] = useState<string>('');
@@ -732,6 +742,127 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
     setNewItemNotes('');
     setNewItemImage('');
     handleSetViewMode('inventory');
+    handleSetViewMode('inventory');
+  };
+
+  const handleStartEdit = (item: StockItem) => {
+    setEditingItem(item);
+    setNewItemName(item.name);
+    setNewItemCategory(item.type);
+    setNewItemIndentFrom(item.indentFrom);
+    setNewItemImcStock(typeof item.imcStock === 'number' ? item.imcStock : item.currentStock);
+    setNewItemPpdStock(typeof item.ppdStock === 'number' ? item.ppdStock : 0);
+    setNewItemUnit(item.unit);
+    setNewItemLocation(item.locationStored || '');
+    setNewItemExpiryDate(item.expiryDate);
+    setNewItemThreshold(item.warningThreshold);
+    setNewItemNotes(item.notes || '');
+    setNewItemImage(item.pictureUrl || '');
+    setViewMode('edit');
+  };
+
+  const handleEditItemSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingItem) return;
+
+    if (!newItemName.trim()) {
+      alert('Please enter item name.');
+      return;
+    }
+
+    if (!newItemCategory) {
+      alert('Please select a Type / Category.');
+      return;
+    }
+
+    if (!newItemIndentFrom) {
+      alert('Please select an Indent From supplier.');
+      return;
+    }
+
+    if (!newItemUnit) {
+      alert('Please select a Unit.');
+      return;
+    }
+
+    if (!newItemExpiryDate) {
+      alert('Please select an expiry date for this stock item.');
+      return;
+    }
+
+    const imcQty = typeof newItemImcStock === 'number' && !isNaN(newItemImcStock) ? newItemImcStock : 0;
+    const ppdQty = typeof newItemPpdStock === 'number' && !isNaN(newItemPpdStock) ? newItemPpdStock : 0;
+    const stockQty = imcQty + ppdQty;
+    const threshold = typeof newItemThreshold === 'number' && !isNaN(newItemThreshold) ? newItemThreshold : 20;
+
+    let updatedBatches = [...(editingItem.batches || [])];
+    if (updatedBatches.length > 0) {
+      updatedBatches[0] = {
+        ...updatedBatches[0],
+        quantity: stockQty
+      };
+    } else {
+      updatedBatches = [{
+        id: `b-${Date.now()}`,
+        batchNumber: `LOT-${new Date().getFullYear()}-01`,
+        quantity: stockQty,
+        expiryDate: newItemExpiryDate,
+        receivedDate: new Date().toISOString().split('T')[0],
+        notes: 'Initial registration lot'
+      }];
+    }
+
+    const updatedItem: StockItem = {
+      ...editingItem,
+      name: newItemName.trim(),
+      type: newItemCategory as StockItemCategory,
+      indentFrom: newItemIndentFrom.trim() || 'Store Pharmacy',
+      currentStock: stockQty,
+      imcStock: imcQty,
+      ppdStock: ppdQty,
+      unit: newItemUnit.trim() || 'Pcs',
+      locationStored: newItemLocation.trim() || 'General Store',
+      warningThreshold: threshold,
+      expiryDate: newItemExpiryDate,
+      batches: updatedBatches,
+      notes: newItemNotes.trim(),
+      pictureUrl: newItemImage || undefined,
+      updatedAt: new Date().toISOString(),
+    };
+
+    setItems(prev => prev.map(item => item.id === editingItem.id ? updatedItem : item));
+    saveItemToFirestore(updatedItem);
+
+    // Registration / Edit Log
+    const editLog: StockTransaction = {
+      id: `trx-${Date.now()}`,
+      itemId: editingItem.id,
+      itemName: updatedItem.name,
+      action: 'ADD',
+      quantity: Math.abs(stockQty - editingItem.currentStock),
+      stockBefore: editingItem.currentStock,
+      stockAfter: stockQty,
+      destinationOrSource: `Item Details Edited (IMC: ${imcQty}, PPD: ${ppdQty})`,
+      staffName: currentUser?.email?.split('@')[0] || 'MA Shafiq',
+      notes: `Item specifications updated by Admin. Previous Stock: ${editingItem.currentStock}, New Stock: ${stockQty}`,
+      timestamp: new Date().toISOString(),
+    };
+
+    setTransactions(prev => [editLog, ...prev]);
+    saveTransactionToFirestore(editLog);
+
+    // Reset Form
+    setNewItemName('');
+    setNewItemCategory('' as StockItemCategory);
+    setNewItemIndentFrom('');
+    setNewItemImcStock('');
+    setNewItemPpdStock('');
+    setNewItemUnit('');
+    setNewItemLocation('');
+    setNewItemThreshold('');
+    setNewItemNotes('');
+    setNewItemImage('');
+    setEditingItem(null);
     handleSetViewMode('inventory');
   };
 
@@ -1108,17 +1239,19 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
             <span>Stock Inventory ({items.length})</span>
           </button>
 
-          <button
-            onClick={() => handleSetViewMode('logs')}
-            className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 min-h-[40px] whitespace-nowrap ${
-              viewMode === 'logs'
-                ? 'bg-violet-600 text-white shadow-md shadow-violet-200'
-                : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200'
-            }`}
-          >
-            <History className="w-4 h-4" />
-            <span>Stock Issue Logs ({transactions.length})</span>
-          </button>
+          {!isGuest && (
+            <button
+              onClick={() => handleSetViewMode('logs')}
+              className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 min-h-[40px] whitespace-nowrap ${
+                viewMode === 'logs'
+                  ? 'bg-violet-600 text-white shadow-md shadow-violet-200'
+                  : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200'
+              }`}
+            >
+              <History className="w-4 h-4" />
+              <span>Stock Issue Logs ({transactions.length})</span>
+            </button>
+          )}
         </div>
 
         {/* Quick Alert Filters for Low Stock & Expiring Items */}
@@ -1551,6 +1684,16 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
                           <span>Issue Stock</span>
                         </button>
 
+                        {isAdmin && (
+                          <button
+                            onClick={() => handleStartEdit(item)}
+                            className="p-2 rounded-xl text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+                            title="Edit Item Details"
+                          >
+                            <Edit3 className="w-4 h-4" />
+                          </button>
+                        )}
+
                         <button
                           onClick={() => setDeletingItemId(item.id)}
                           className="p-2 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
@@ -1731,6 +1874,16 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
                                   <MinusCircle className="w-4 h-4" />
                                 </button>
 
+                                {isAdmin && (
+                                  <button
+                                    onClick={() => handleStartEdit(item)}
+                                    className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50"
+                                    title="Edit Item Details"
+                                  >
+                                    <Edit3 className="w-4 h-4" />
+                                  </button>
+                                )}
+
                                 <button
                                   onClick={() => setDeletingItemId(item.id)}
                                   className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50"
@@ -1753,29 +1906,38 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
       )}
 
       {/* ========================================================================= */}
-      {/* VIEW MODE 2: REGISTER NEW ITEM FORM */}
+      {/* VIEW MODE 2: REGISTER NEW ITEM FORM / EDIT ITEM FORM */}
       {/* ========================================================================= */}
-      {viewMode === 'register' && (
+      {(viewMode === 'register' || viewMode === 'edit') && (
         <div className="max-w-3xl mx-auto bg-white rounded-3xl border border-slate-200 shadow-md p-6 sm:p-8 space-y-6">
           <div className="border-b border-slate-100 pb-4 flex items-center justify-between">
             <div>
               <h3 className="text-lg font-black text-slate-900 flex items-center gap-2 font-futuristic">
-                <PlusCircle className="w-5 h-5 text-violet-600" />
-                Register New Hub Item
+                {viewMode === 'edit' ? (
+                  <Edit3 className="w-5 h-5 text-violet-600" />
+                ) : (
+                  <PlusCircle className="w-5 h-5 text-violet-600" />
+                )}
+                {viewMode === 'edit' ? 'Edit Registered Item Details' : 'Register New Hub Item'}
               </h3>
               <p className="text-xs text-slate-500 mt-1">
-                Enter technical item specifications, indent source, photo, and custom warning threshold.
+                {viewMode === 'edit'
+                  ? 'Modify technical specifications, supplier, and warning threshold for this registered item.'
+                  : 'Enter technical item specifications, indent source, photo, and custom warning threshold.'}
               </p>
             </div>
             <button
-              onClick={() => setViewMode('inventory')}
+              onClick={() => {
+                setEditingItem(null);
+                setViewMode('inventory');
+              }}
               className="text-xs font-bold text-slate-500 hover:text-slate-800 p-2"
             >
               Cancel & Back
             </button>
           </div>
 
-          <form onSubmit={handleRegisterItem} className="space-y-5">
+          <form onSubmit={viewMode === 'edit' ? handleEditItemSubmit : handleRegisterItem} className="space-y-5">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               
               {/* Item Name */}
@@ -1879,21 +2041,6 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
                 </select>
               </div>
 
-              {/* Unit Price (RM) - Non mandatory */}
-              <div className="space-y-1">
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide">
-                  Price Per Item (RM) <span className="text-slate-400 font-normal text-[10px] lowercase">(optional)</span>
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  placeholder="e.g. 0.85"
-                  value={newItemPrice}
-                  onChange={(e) => setNewItemPrice(e.target.value === '' ? '' : parseFloat(e.target.value))}
-                  className="w-full px-3.5 py-2.5 text-xs font-mono font-bold border border-slate-300 rounded-xl focus:ring-2 focus:ring-violet-500 bg-slate-50/30"
-                />
-              </div>
-
               {/* Location Stored - Non mandatory */}
               <div className="space-y-1">
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide">
@@ -1993,7 +2140,10 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
             <div className="pt-4 border-t border-slate-100 flex items-center justify-end gap-3">
               <button
                 type="button"
-                onClick={() => setViewMode('inventory')}
+                onClick={() => {
+                  setEditingItem(null);
+                  setViewMode('inventory');
+                }}
                 className="px-5 py-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs font-bold transition-all"
               >
                 Cancel
@@ -2003,7 +2153,7 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
                 className="px-6 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold transition-all shadow-md flex items-center gap-1.5"
               >
                 <CheckCircle2 className="w-4 h-4" />
-                <span>Save & Register Item</span>
+                <span>{viewMode === 'edit' ? 'Save & Update Item' : 'Save & Register Item'}</span>
               </button>
             </div>
           </form>
@@ -2013,7 +2163,7 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
       {/* ========================================================================= */}
       {/* VIEW MODE 3: TRANSACTION AUDIT LOGS */}
       {/* ========================================================================= */}
-      {viewMode === 'logs' && (
+      {viewMode === 'logs' && !isGuest && (
         <div className="bg-white rounded-3xl border border-slate-200 shadow-2xs p-6 space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
             <div>
