@@ -412,6 +412,7 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
 
   // Active View State & Layout Mode
   const [viewMode, setViewMode] = useState<'inventory' | 'register' | 'logs' | 'summary' | 'edit'>('inventory');
+  const [savedScrollPosition, setSavedScrollPosition] = useState<number | null>(null);
   const [inventoryLayout, setInventoryLayout] = useState<'grid' | 'list'>('list'); // Default to 'list' (List View)
 
   // Sync incoming activeTab with viewMode
@@ -433,9 +434,22 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
       else if (mode === 'logs') setActiveTab('stock_logs');
       else if (mode === 'summary') setActiveTab('stock_summary');
     }
-    // Instantly scroll to the top of the page when view modes are changed/saved to prevent being stuck at the bottom
-    window.scrollTo({ top: 0, behavior: 'instant' });
+    // Instantly scroll to the top of the page when view modes are changed/saved to prevent being stuck at the bottom (unless we are restoring a scroll position)
+    if (savedScrollPosition === null) {
+      window.scrollTo({ top: 0, behavior: 'instant' });
+    }
   };
+
+  // Restore scroll position when returning to inventory view from edit mode
+  useEffect(() => {
+    if (viewMode === 'inventory' && savedScrollPosition !== null) {
+      const timer = setTimeout(() => {
+        window.scrollTo({ top: savedScrollPosition, behavior: 'instant' });
+        setSavedScrollPosition(null);
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [viewMode, savedScrollPosition]);
 
   // Filters & Search
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -767,6 +781,10 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
   };
 
   const handleStartEdit = (item: StockItem) => {
+    // Capture current scroll position to restore on save/cancel
+    const scrollPos = window.scrollY || document.documentElement.scrollTop;
+    setSavedScrollPosition(scrollPos);
+
     setEditingItem(item);
     setNewItemName(item.name);
     setNewItemCategory(item.type);
