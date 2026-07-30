@@ -91,7 +91,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   } else if (currentSubsection === 'stock_take') {
     navItems = [
       { id: 'stock_inventory', label: 'Stock Inventory', icon: Package },
-      { id: 'stock_logs', label: 'Transaction Logs', icon: History },
+      ...(!isGuest ? [{ id: 'stock_logs', label: 'Transaction Logs', icon: History }] : []),
     ];
   }
 

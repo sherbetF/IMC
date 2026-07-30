@@ -66,16 +66,17 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   return (
-    <header className="sticky top-0 z-30 bg-white border-b border-slate-200/80 shadow-2xs">
-      {/* Development Notice Strip */}
-      <div className="bg-gradient-to-r from-amber-500 via-amber-600 to-indigo-600 text-white px-4 py-1.5 text-center text-[11px] font-bold tracking-wide flex items-center justify-center gap-1.5 shadow-inner">
+    <>
+      {/* Development Notice Strip - Always Sticky Top */}
+      <div className="sticky top-0 z-40 bg-gradient-to-r from-amber-500 via-amber-600 to-indigo-600 text-white px-4 py-1.5 text-center text-[11px] font-bold tracking-wide flex items-center justify-center gap-1.5 shadow-md">
         <span className="bg-white/20 px-1.5 py-0.5 rounded text-[10px] uppercase font-extrabold tracking-wider">
           Notice
         </span>
         <span>This site is still under development . If you have any inquiries , please contact MA Shafiq IMC :)</span>
       </div>
 
-      <div className="px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
+      <header className={`${currentSubsection === 'stock_take' ? 'relative' : 'sticky top-[28px]'} z-30 bg-white border-b border-slate-200/80 shadow-2xs`}>
+        <div className="px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
         {/* Mobile Toggle & Page Title */}
         <div className="flex items-center space-x-3">
           <button
@@ -137,6 +138,7 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       </div>
     </header>
+    </>
   );
 };
 

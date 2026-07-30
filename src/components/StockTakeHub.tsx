@@ -433,6 +433,8 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
       else if (mode === 'logs') setActiveTab('stock_logs');
       else if (mode === 'summary') setActiveTab('stock_summary');
     }
+    // Instantly scroll to the top of the page when view modes are changed/saved to prevent being stuck at the bottom
+    window.scrollTo({ top: 0, behavior: 'instant' });
   };
 
   // Filters & Search
@@ -440,7 +442,7 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
   const [selectedIndent, setSelectedIndent] = useState<string>('ALL');
   const [showLowStockOnly, setShowLowStockOnly] = useState<boolean>(false);
-  const [showExpiringOnly, setShowExpiringOnly] = useState<boolean>(false);
+  const [expiringFilter, setExpiringFilter] = useState<'ALL' | '90' | '180'>('ALL');
   const [selectedStoreFilter, setSelectedStoreFilter] = useState<'ALL' | 'IMC' | 'PPD'>('ALL');
 
   // Modals State
@@ -573,7 +575,14 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
         daysLeft: diffDays,
         badgeClass: 'bg-rose-600 text-white border-rose-700 font-black shadow-xs'
       };
-    } else if (diffDays <= 60) {
+    } else if (diffDays <= 90) {
+      return {
+        label: `Expiring in ${diffDays} days`,
+        status: 'EXPIRING_SOON',
+        daysLeft: diffDays,
+        badgeClass: 'bg-rose-100 text-rose-900 border-rose-300 font-extrabold'
+      };
+    } else if (diffDays >= 120 && diffDays <= 180) {
       return {
         label: `Expiring in ${diffDays} days`,
         status: 'EXPIRING_SOON',
@@ -595,10 +604,18 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
   const totalQuantityUnits = items.reduce((sum, item) => sum + item.currentStock, 0);
   const lowStockItems = items.filter(item => item.currentStock <= item.warningThreshold);
   const outOfStockItems = items.filter(item => item.currentStock === 0);
-  const expiringOrExpiredItems = items.filter(item => {
+  
+  const expiring90Items = items.filter(item => {
     const info = getExpiryInfo(item.expiryDate);
-    return info.status === 'EXPIRED' || info.status === 'EXPIRING_SOON';
+    return info.status === 'EXPIRED' || (info.status === 'EXPIRING_SOON' && info.daysLeft <= 90);
   });
+
+  const expiring180Items = items.filter(item => {
+    const info = getExpiryInfo(item.expiryDate);
+    return info.status !== 'EXPIRED' && info.status === 'EXPIRING_SOON' && info.daysLeft >= 120 && info.daysLeft <= 180;
+  });
+
+  const expiringOrExpiredItems = expiring180Items; // Fallback for backwards compatibility/header state
 
   // Filtered Items List
   const filteredItems = items.filter(item => {
@@ -617,9 +634,13 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
         : (item.ppdStock ?? 0);
 
     const matchesLowStock = !showLowStockOnly || activeStock <= item.warningThreshold;
-    const matchesExpiring = !showExpiringOnly || (() => {
+    const matchesExpiring = expiringFilter === 'ALL' || (() => {
       const info = getExpiryInfo(item.expiryDate);
-      return info.status === 'EXPIRED' || info.status === 'EXPIRING_SOON';
+      if (expiringFilter === '90') {
+        return info.status === 'EXPIRED' || (info.status === 'EXPIRING_SOON' && info.daysLeft <= 90);
+      } else { // '180'
+        return info.status !== 'EXPIRED' && info.status === 'EXPIRING_SOON' && info.daysLeft >= 120 && info.daysLeft <= 180;
+      }
     })();
 
     const matchesStore = selectedStoreFilter === 'ALL' || 
@@ -1206,19 +1227,28 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
           </div>
 
           <div className={`rounded-2xl p-3.5 border backdrop-blur-md transition-all ${
-            expiringOrExpiredItems.length > 0 
+            expiring180Items.length > 0 
               ? 'bg-rose-500/20 border-rose-400/40 text-rose-100' 
               : 'bg-white/10 border-white/10 text-white'
           }`}>
             <p className="text-[10px] uppercase tracking-wider font-extrabold text-indigo-200 flex items-center gap-1">
-              {expiringOrExpiredItems.length > 0 && <Clock className="w-3 h-3 text-rose-300 animate-pulse" />}
+              {expiring180Items.length > 0 && <Clock className="w-3 h-3 text-rose-300 animate-pulse" />}
               <span>Near Expiring</span>
             </p>
-            <div className="flex items-baseline justify-between mt-1">
-              <span className={`text-xl sm:text-2xl font-black font-mono ${expiringOrExpiredItems.length > 0 ? 'text-rose-300' : 'text-white'}`}>
-                {expiringOrExpiredItems.length}
-              </span>
-              <span className="text-[10px] text-indigo-200">≤ 60d / Expired</span>
+            <div className="flex items-center justify-between mt-2 gap-4">
+              <div className="flex flex-col">
+                <span className={`text-xl font-black font-mono ${expiring90Items.length > 0 ? 'text-rose-400 animate-pulse' : 'text-white'}`}>
+                  {expiring90Items.length}
+                </span>
+                <span className="text-[9px] text-rose-200 uppercase font-bold">&lt;3 Months</span>
+              </div>
+              <div className="w-px h-6 bg-white/20"></div>
+              <div className="flex flex-col">
+                <span className={`text-xl font-black font-mono ${expiring180Items.length > 0 ? 'text-amber-300' : 'text-white'}`}>
+                  {expiring180Items.length}
+                </span>
+                <span className="text-[9px] text-amber-200 uppercase font-bold">&lt;6 Months</span>
+              </div>
             </div>
           </div>
         </div>
@@ -1270,15 +1300,27 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
             </button>
 
             <button
-              onClick={() => setShowExpiringOnly(!showExpiringOnly)}
+              onClick={() => setExpiringFilter(prev => prev === '90' ? 'ALL' : '90')}
               className={`px-3 py-2 rounded-xl text-xs font-extrabold border transition-all flex items-center gap-1.5 min-h-[40px] ${
-                showExpiringOnly
+                expiringFilter === '90'
+                  ? 'bg-rose-600 text-white border-rose-600 shadow-xs'
+                  : 'bg-white text-slate-700 border-slate-200 hover:bg-rose-50 hover:text-rose-800'
+              }`}
+            >
+              <Calendar className={`w-3.5 h-3.5 ${expiringFilter === '90' ? 'text-white' : 'text-rose-600'}`} />
+              <span>&lt; 3 Months Expiring {expiring90Items.length > 0 && `(${expiring90Items.length})`}</span>
+            </button>
+
+            <button
+              onClick={() => setExpiringFilter(prev => prev === '180' ? 'ALL' : '180')}
+              className={`px-3 py-2 rounded-xl text-xs font-extrabold border transition-all flex items-center gap-1.5 min-h-[40px] ${
+                expiringFilter === '180'
                   ? 'bg-amber-600 text-white border-amber-600 shadow-xs'
                   : 'bg-white text-slate-700 border-slate-200 hover:bg-amber-50 hover:text-amber-800'
               }`}
             >
-              <Calendar className={`w-3.5 h-3.5 ${showExpiringOnly ? 'text-white' : 'text-amber-600'}`} />
-              <span>Expiring / Expired {expiringOrExpiredItems.length > 0 && `(${expiringOrExpiredItems.length})`}</span>
+              <Calendar className={`w-3.5 h-3.5 ${expiringFilter === '180' ? 'text-white' : 'text-amber-600'}`} />
+              <span>&lt; 6 Months Expiring {expiring180Items.length > 0 && `(${expiring180Items.length})`}</span>
             </button>
           </div>
         )}
@@ -1430,14 +1472,14 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
             </div>
           )}
 
-          {showExpiringOnly && (
+          {expiringFilter !== 'ALL' && (
             <div className="bg-amber-50 border border-amber-200 text-amber-900 p-4 rounded-2xl flex items-center justify-between">
               <div className="flex items-center gap-2 text-xs font-bold">
                 <Calendar className="w-4 h-4 text-amber-600 animate-pulse" />
-                <span>Showing items that are expired or expiring within 60 days!</span>
+                <span>{expiringFilter === '90' ? 'Showing items that are expired or expiring within 3 months!' : 'Showing items expiring between 4 and 6 months!'}</span>
               </div>
               <button
-                onClick={() => setShowExpiringOnly(false)}
+                onClick={() => setExpiringFilter('ALL')}
                 className="text-xs text-amber-800 font-extrabold underline hover:text-amber-950"
               >
                 Show All Items
@@ -1459,7 +1501,7 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
                   setSelectedCategory('ALL');
                   setSelectedIndent('ALL');
                   setShowLowStockOnly(false);
-                  setShowExpiringOnly(false);
+                  setExpiringFilter('ALL');
                 }}
                 className="px-4 py-2 bg-violet-600 text-white rounded-xl text-xs font-bold hover:bg-violet-700 transition-all"
               >

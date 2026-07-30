@@ -318,7 +318,7 @@ const MainAppContent: React.FC = () => {
 
         {/* Portal Footer */}
         <div className="max-w-7xl w-full mx-auto text-center text-[11px] text-slate-400 font-medium pt-5 border-t border-slate-200/50">
-          Medical Cardiology Workspace Services. All credentials and local sessions are securely authorized.
+          Internal Medicine Workspace Services. All credentials and local sessions are securely authorized.
         </div>
 
       </div>
