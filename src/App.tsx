@@ -83,14 +83,14 @@ const MainAppContent: React.FC = () => {
             </div>
             <div>
               <h1 className="font-extrabold text-base sm:text-lg tracking-tight text-slate-900 font-futuristic flex items-center gap-2">
-                <span>Clinical Workspace</span>
+                <span>Internal Medicine Workspace Services</span>
                 {isGuest && (
                   <span className="text-[10px] uppercase font-bold bg-indigo-100 text-indigo-800 border border-indigo-200 px-2 py-0.5 rounded-md">
                     Guest Mode
                   </span>
                 )}
               </h1>
-              <p className="text-xs text-slate-500 font-medium">Cardiology Department Services Portal</p>
+              <p className="text-xs text-slate-500 font-medium">Hospital Sultan Ismail</p>
             </div>
           </div>
 
@@ -109,7 +109,7 @@ const MainAppContent: React.FC = () => {
           <div className="text-center space-y-3">
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-50 border border-indigo-100 text-xs font-bold text-indigo-700">
               <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
-              <span>{isGuest ? 'Welcome Guest Visitor' : 'Welcome Back Gaissss'}</span>
+              <span>Welcome Gaissssssss</span>
             </div>
             <h2 className="text-2xl sm:text-4xl font-extrabold tracking-tight text-slate-900 font-futuristic">
               Select Department Sub-Section
@@ -146,7 +146,7 @@ const MainAppContent: React.FC = () => {
                     {isGuest && <Lock className="w-3.5 h-3.5 text-slate-400 shrink-0" />}
                   </h3>
                   <p className="text-xs text-slate-500 leading-relaxed">
-                    Manage and audit scanned medical report files from major clinics including KPJ Dato Onn, KPJ Johor, HSA, and Columbia Asia.
+                    Manage scanned outsource medical report files from major Government &amp; Private institution
                   </p>
                 </div>
               </div>
@@ -186,7 +186,7 @@ const MainAppContent: React.FC = () => {
                     )}
                   </div>
                   <p className="text-xs text-slate-500 leading-relaxed">
-                    Venepuncture supplies inventory, item registration, low-stock threshold alerts, issuance log audits, and total RM valuation.
+                    Venepuncture supplies inventory, item registration, low-stock threshold alerts, and issuance log audits.
                   </p>
                 </div>
               </div>
@@ -219,7 +219,7 @@ const MainAppContent: React.FC = () => {
                     {isGuest && <Lock className="w-3.5 h-3.5 text-slate-400 shrink-0" />}
                   </h3>
                   <p className="text-xs text-slate-500 leading-relaxed">
-                    Execute Diastolic Dysfunction 2025 flowchart algorithms and store interesting case studies with high-quality looping GIFs and MP4s.
+                    Execute ( calculator ) guideline or flowchart algorithms and store interesting case studies in GIF / MP4
                   </p>
                 </div>
               </div>

@@ -24,7 +24,7 @@ export const Header: React.FC<HeaderProps> = ({
   const getTitle = () => {
     if (currentSubsection === 'echocardiogram') {
       switch (activeTab) {
-        case 'echo_calculator': return 'Diastolic Function Suite';
+        case 'echo_calculator': return 'Echocardiogram Suite';
         case 'echo_ph': return 'Pulmonary Artery Systolic Pressure';
         case 'echo_rv_fac': return 'RV Fractional Area Change (RV FAC)';
         case 'echo_as': return 'Aortic Stenosis Severity Suite';
@@ -54,7 +54,7 @@ export const Header: React.FC<HeaderProps> = ({
 
   const getSubtitle = () => {
     if (currentSubsection === 'echocardiogram') {
-      return 'Diastolic dysfunction clinical algorithms and cardiac ultrasound registry';
+      return 'Guideline calculator & Flowchart algorithm';
     } else if (currentSubsection === 'holter_schedule') {
       return 'Cardioscan cardiac monitor fleet allocation and active patient scheduler';
     } else if (currentSubsection === 'medical_records') {
@@ -103,41 +103,6 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Right Action Controls */}
         <div className="flex items-center space-x-2">
-          {/* Quick Sub-section Selector Dropdown */}
-          <div className="relative">
-            <select
-              value={currentSubsection}
-              onChange={(e) => {
-                const selected = e.target.value as any;
-                if (isGuest && selected !== 'stock_take' && selected !== 'portal') {
-                  return;
-                }
-                setCurrentSubsection(selected);
-              }}
-              className="appearance-none bg-slate-100 hover:bg-slate-200/80 text-slate-800 text-xs font-bold py-2 pl-3 pr-8 rounded-xl border border-slate-200 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 cursor-pointer transition-all min-h-[40px]"
-            >
-              <option value="stock_take">💉 Stock Management System</option>
-              <option value="portal">❖ Main Portal Menu</option>
-              <option value="outsource_database" disabled={isGuest}>
-                {isGuest ? '📂 Outsource Database (Locked for Guest)' : '📂 Outsource Database'}
-              </option>
-              <option value="medical_records" disabled={isGuest}>
-                {isGuest ? '🏥 Temporary Medical Record (Locked for Guest)' : '🏥 Temporary Medical Record (TMR)'}
-              </option>
-              <option value="echocardiogram" disabled={isGuest}>
-                {isGuest ? '🫀 Echo Suite (Locked for Guest)' : '🫀 Echo Suite'}
-              </option>
-              <option value="holter_schedule" disabled={isGuest}>
-                {isGuest ? '📅 Holter Scheduler (Locked for Guest)' : '📅 Holter Scheduler'}
-              </option>
-            </select>
-            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-500">
-              <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 20 20">
-                <path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" />
-              </svg>
-            </div>
-          </div>
-
           {/* Admin Panel Quick Access Button */}
           {isAdmin && currentSubsection === 'outsource_database' && activeTab !== 'admin' && (
             <button

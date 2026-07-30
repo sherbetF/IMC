@@ -34,7 +34,8 @@ import {
   Clock,
   AlertCircle,
   ArrowLeftRight,
-  Eye
+  Eye,
+  Lock
 } from 'lucide-react';
 import { StockItem, StockTransaction, StockItemCategory, StockActionType, StockBatch } from '../types';
 import { useAuth } from '../context/AuthContext';
@@ -582,7 +583,6 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
   // Calculated Summary Metrics
   const totalItemsCount = items.length;
   const totalQuantityUnits = items.reduce((sum, item) => sum + item.currentStock, 0);
-  const totalInventoryPriceRM = items.reduce((sum, item) => sum + (item.currentStock * item.pricePerUnit), 0);
   const lowStockItems = items.filter(item => item.currentStock <= item.warningThreshold);
   const outOfStockItems = items.filter(item => item.currentStock === 0);
   const expiringOrExpiredItems = items.filter(item => {
@@ -1003,21 +1003,6 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
 
   return (
     <div className="space-y-6">
-      {/* Guest Mode Notice Banner */}
-      {isGuest && (
-        <div className="bg-indigo-50/90 border border-indigo-200/90 rounded-2xl p-4 text-xs font-bold text-indigo-900 flex items-center justify-between shadow-2xs">
-          <div className="flex items-center gap-2.5">
-            <Eye className="w-4 h-4 text-indigo-600 shrink-0" />
-            <span>
-              <strong>Guest Mode Active (View-Only):</strong> You can inspect stock inventory, search, filter, and review logs. Adding, editing, adjusting, or deleting stock items is disabled.
-            </span>
-          </div>
-          <span className="bg-indigo-200/80 text-indigo-800 text-[10px] px-2.5 py-1 rounded-full uppercase font-black shrink-0">
-            Read Only
-          </span>
-        </div>
-      )}
-      
       {/* Top Banner Header */}
       <div className="bg-gradient-to-r from-violet-900 via-indigo-900 to-slate-900 text-white rounded-3xl p-6 sm:p-8 shadow-xl border border-indigo-950 relative overflow-hidden">
         <div className="absolute top-0 right-0 -mt-8 -mr-8 w-64 h-64 bg-violet-500/10 rounded-full blur-3xl pointer-events-none" />
@@ -1063,21 +1048,12 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
         </div>
 
         {/* Dashboard Top Metrics Bar */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6 pt-6 border-t border-white/10">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-6 pt-6 border-t border-white/10">
           <div className="bg-white/10 backdrop-blur-md rounded-2xl p-3.5 border border-white/10">
             <p className="text-[10px] uppercase tracking-wider font-extrabold text-indigo-200">Total Items Indented</p>
             <div className="flex items-baseline justify-between mt-1">
               <span className="text-xl sm:text-2xl font-black font-mono text-white">{totalItemsCount}</span>
               <span className="text-[10px] text-indigo-300 font-bold">{totalQuantityUnits} units</span>
-            </div>
-          </div>
-
-          <div className="bg-white/10 backdrop-blur-md rounded-2xl p-3.5 border border-white/10">
-            <p className="text-[10px] uppercase tracking-wider font-extrabold text-indigo-200">Total Inventory Value</p>
-            <div className="flex items-baseline justify-between mt-1">
-              <span className="text-xl sm:text-2xl font-black font-mono text-emerald-300">
-                RM {totalInventoryPriceRM.toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </span>
             </div>
           </div>
 
@@ -1142,18 +1118,6 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
           >
             <History className="w-4 h-4" />
             <span>Stock Issue Logs ({transactions.length})</span>
-          </button>
-
-          <button
-            onClick={() => handleSetViewMode('summary')}
-            className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 min-h-[40px] whitespace-nowrap ${
-              viewMode === 'summary'
-                ? 'bg-violet-600 text-white shadow-md shadow-violet-200'
-                : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200'
-            }`}
-          >
-            <TrendingUp className="w-4 h-4" />
-            <span>Indent & Value Dashboard</span>
           </button>
         </div>
 
@@ -1525,7 +1489,7 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
                         </div>
                       </div>
 
-                      {/* Meta Details: Indent From, Price RM, Location */}
+                      {/* Meta Details: Indent From & Location */}
                       <div className="space-y-1.5 text-xs text-slate-600 border-t border-slate-100 pt-2.5">
                         <div className="flex items-center justify-between">
                           <span className="text-slate-500 flex items-center gap-1 text-[11px]">
@@ -1543,20 +1507,6 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
                           <span className="font-bold text-slate-800 text-[11px]">
                             {item.locationStored}
                           </span>
-                        </div>
-
-                        <div className="flex items-center justify-between">
-                          <span className="text-slate-500 flex items-center gap-1 text-[11px]">
-                            <DollarSign className="w-3 h-3 text-emerald-600" /> Unit Price (RM):
-                          </span>
-                          <span className="font-mono font-bold text-slate-800 text-[11px]">
-                            RM {item.pricePerUnit.toFixed(2)}
-                          </span>
-                        </div>
-
-                        <div className="flex items-center justify-between bg-emerald-50/60 p-1.5 rounded-lg border border-emerald-100 text-[11px]">
-                          <span className="font-bold text-emerald-900">Total Indented Value:</span>
-                          <span className="font-mono font-extrabold text-emerald-700">RM {totalItemValRM}</span>
                         </div>
 
                         {item.notes && (
@@ -1627,10 +1577,9 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
                       <th className="py-3.5 px-4">Item & Category</th>
                       <th className="py-3.5 px-4 text-center">Current Stock</th>
                       <th className="py-3.5 px-4">Expiry Date</th>
-                      <th className="py-3.5 px-4">Indent Supplier</th>
+                      <th className="py-3.5 px-4">Supplier</th>
                       <th className="py-3.5 px-4">Location</th>
-                      <th className="py-3.5 px-4 text-right">Price / Total Value</th>
-                      <th className="py-3.5 px-4 text-center">Quick Actions</th>
+                      {!isGuest && <th className="py-3.5 px-4 text-center">Quick Actions</th>}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 text-slate-800">
@@ -1754,21 +1703,9 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
                             </div>
                           </td>
 
-                          {/* Column 6: Price & Valuation */}
-                          <td className="py-3 px-4 text-right">
-                            <div className="font-mono text-xs">
-                              <div className="font-bold text-slate-900">RM {totalItemValRM}</div>
-                              <div className="text-[10px] text-slate-400">RM {item.pricePerUnit.toFixed(2)} / {item.unit}</div>
-                            </div>
-                          </td>
-
-                          {/* Column 7: Actions */}
-                          <td className="py-3 px-4 text-center">
-                            {isGuest ? (
-                              <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-1 rounded">
-                                View Only
-                              </span>
-                            ) : (
+                          {/* Column 6: Actions */}
+                          {!isGuest && (
+                            <td className="py-3 px-4 text-center">
                               <div className="flex items-center justify-center gap-1">
                                 <button
                                   onClick={() => {
@@ -1802,8 +1739,8 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
                                   <Trash2 className="w-4 h-4" />
                                 </button>
                               </div>
-                            )}
-                          </td>
+                            </td>
+                          )}
                         </tr>
                       );
                     })}
@@ -1827,7 +1764,7 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
                 Register New Hub Item
               </h3>
               <p className="text-xs text-slate-500 mt-1">
-                Enter technical item specifications, indent source, price in RM, photo, and custom warning threshold.
+                Enter technical item specifications, indent source, photo, and custom warning threshold.
               </p>
             </div>
             <button
@@ -2823,35 +2760,37 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
                           </span>
                         </div>
 
-                        {confirmDeleteBatchId === batch.id ? (
-                          <div className="flex items-center gap-1 shrink-0">
+                        {!isGuest && (
+                          confirmDeleteBatchId === batch.id ? (
+                            <div className="flex items-center gap-1 shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  handleDeleteBatchFromItem(batch.id);
+                                  setConfirmDeleteBatchId(null);
+                                }}
+                                className="px-2 py-1 bg-rose-600 hover:bg-rose-700 text-white text-[10px] font-bold rounded-lg transition-colors"
+                              >
+                                Delete
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setConfirmDeleteBatchId(null)}
+                                className="px-2 py-1 bg-slate-200 hover:bg-slate-300 text-slate-700 text-[10px] font-bold rounded-lg transition-colors"
+                              >
+                                No
+                              </button>
+                            </div>
+                          ) : (
                             <button
                               type="button"
-                              onClick={() => {
-                                handleDeleteBatchFromItem(batch.id);
-                                setConfirmDeleteBatchId(null);
-                              }}
-                              className="px-2 py-1 bg-rose-600 hover:bg-rose-700 text-white text-[10px] font-bold rounded-lg transition-colors"
+                              onClick={() => setConfirmDeleteBatchId(batch.id)}
+                              className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors"
+                              title="Delete Batch"
                             >
-                              Delete
+                              <Trash2 className="w-4 h-4" />
                             </button>
-                            <button
-                              type="button"
-                              onClick={() => setConfirmDeleteBatchId(null)}
-                              className="px-2 py-1 bg-slate-200 hover:bg-slate-300 text-slate-700 text-[10px] font-bold rounded-lg transition-colors"
-                            >
-                              No
-                            </button>
-                          </div>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => setConfirmDeleteBatchId(batch.id)}
-                            className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors"
-                            title="Delete Batch"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                          )
                         )}
                       </div>
                     </div>
@@ -2860,89 +2799,93 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
               </div>
             </div>
 
-            {/* Form: Add New Expiry Batch */}
-            <form onSubmit={handleAddNewBatchToItem} className="bg-slate-50 border border-slate-200 p-4 rounded-2xl space-y-3">
-              <h4 className="text-xs font-extrabold text-slate-900 flex items-center gap-1.5">
-                <PlusCircle className="w-4 h-4 text-emerald-600" />
-                Register Additional Batch / Lot Expiry Date
-              </h4>
+            {/* Form: Add New Expiry Batch (Hidden in Guest Mode) */}
+            {!isGuest && (
+              <form onSubmit={handleAddNewBatchToItem} className="bg-slate-50 border border-slate-200 p-4 rounded-2xl space-y-3">
+                <h4 className="text-xs font-extrabold text-slate-900 flex items-center gap-1.5">
+                  <PlusCircle className="w-4 h-4 text-emerald-600" />
+                  Register Additional Batch / Lot Expiry Date
+                </h4>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-700 uppercase tracking-wide mb-1">
+                      Lot / Batch #
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. LOT-2027-B1"
+                      value={newBatchNumber}
+                      onChange={(e) => setNewBatchNumber(e.target.value)}
+                      className="w-full px-3 py-2 text-xs font-bold border border-slate-300 rounded-xl bg-white focus:ring-2 focus:ring-violet-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-700 uppercase tracking-wide mb-1">
+                      Quantity ({managingBatchesItem.unit})
+                    </label>
+                    <input
+                      type="number"
+                      required
+                      min="1"
+                      value={newBatchQty}
+                      onChange={(e) => setNewBatchQty(e.target.value === '' ? '' : parseInt(e.target.value))}
+                      className="w-full px-3 py-2 text-xs font-mono font-bold border border-slate-300 rounded-xl bg-white focus:ring-2 focus:ring-violet-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-700 uppercase tracking-wide mb-1">
+                      Expiration Date *
+                    </label>
+                    <input
+                      type="date"
+                      required
+                      value={newBatchExpiryDate}
+                      onChange={(e) => setNewBatchExpiryDate(e.target.value)}
+                      className="w-full px-3 py-2 text-xs font-bold border border-violet-300 rounded-xl bg-violet-50/50 focus:ring-2 focus:ring-violet-500"
+                    />
+                  </div>
+                </div>
+
                 <div>
                   <label className="block text-[10px] font-bold text-slate-700 uppercase tracking-wide mb-1">
-                    Lot / Batch #
+                    Batch Remarks (Optional)
                   </label>
                   <input
                     type="text"
-                    required
-                    placeholder="e.g. LOT-2027-B1"
-                    value={newBatchNumber}
-                    onChange={(e) => setNewBatchNumber(e.target.value)}
-                    className="w-full px-3 py-2 text-xs font-bold border border-slate-300 rounded-xl bg-white focus:ring-2 focus:ring-violet-500"
+                    placeholder="e.g. HSA Indent #882 shipment"
+                    value={newBatchNotes}
+                    onChange={(e) => setNewBatchNotes(e.target.value)}
+                    className="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl bg-white focus:ring-2 focus:ring-violet-500"
                   />
                 </div>
 
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-700 uppercase tracking-wide mb-1">
-                    Quantity ({managingBatchesItem.unit})
-                  </label>
-                  <input
-                    type="number"
-                    required
-                    min="1"
-                    value={newBatchQty}
-                    onChange={(e) => setNewBatchQty(e.target.value === '' ? '' : parseInt(e.target.value))}
-                    className="w-full px-3 py-2 text-xs font-mono font-bold border border-slate-300 rounded-xl bg-white focus:ring-2 focus:ring-violet-500"
-                  />
+                <div className="pt-1 flex items-center justify-end">
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm flex items-center gap-1.5"
+                  >
+                    <PlusCircle className="w-4 h-4" />
+                    <span>Save New Batch to Inventory</span>
+                  </button>
                 </div>
+              </form>
+            )}
 
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-700 uppercase tracking-wide mb-1">
-                    Expiration Date *
-                  </label>
-                  <input
-                    type="date"
-                    required
-                    value={newBatchExpiryDate}
-                    onChange={(e) => setNewBatchExpiryDate(e.target.value)}
-                    className="w-full px-3 py-2 text-xs font-bold border border-violet-300 rounded-xl bg-violet-50/50 focus:ring-2 focus:ring-violet-500"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-bold text-slate-700 uppercase tracking-wide mb-1">
-                  Batch Remarks (Optional)
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. HSA Indent #882 shipment"
-                  value={newBatchNotes}
-                  onChange={(e) => setNewBatchNotes(e.target.value)}
-                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl bg-white focus:ring-2 focus:ring-violet-500"
-                />
-              </div>
-
-              <div className="pt-1 flex items-center justify-end">
+            {!isGuest && (
+              <div className="pt-2 border-t border-slate-100 flex items-center justify-end">
                 <button
-                  type="submit"
-                  className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-md flex items-center gap-1.5"
+                  type="button"
+                  onClick={() => setManagingBatchesItem(null)}
+                  className="px-5 py-2 rounded-xl bg-slate-900 text-white text-xs font-bold hover:bg-slate-800"
                 >
-                  <PlusCircle className="w-3.5 h-3.5" />
-                  <span>Add Batch to Inventory</span>
+                  Close Manager
                 </button>
               </div>
-            </form>
-
-            <div className="pt-2 border-t border-slate-100 flex items-center justify-end">
-              <button
-                type="button"
-                onClick={() => setManagingBatchesItem(null)}
-                className="px-5 py-2 rounded-xl bg-slate-900 text-white text-xs font-bold hover:bg-slate-800"
-              >
-                Close Manager
-              </button>
-            </div>
+            )}
 
           </div>
         </div>

@@ -102,9 +102,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveTab, setCurrentSu
             <div>
               <h2 className="text-sm font-extrabold tracking-tight text-white flex items-center gap-2">
                 <Stethoscope className="w-4 h-4 text-indigo-400" />
-                <span>Cardiology Department Services Portal</span>
+                <span>Hospital Sultan Ismail</span>
               </h2>
-              <p className="text-xs text-slate-400">Directly switch between clinical registries, diagnostic suites, and patient logs</p>
             </div>
             <button
               onClick={() => setCurrentSubsection('portal')}

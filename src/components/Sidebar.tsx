@@ -92,7 +92,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
     navItems = [
       { id: 'stock_inventory', label: 'Stock Inventory', icon: Package },
       { id: 'stock_logs', label: 'Transaction Logs', icon: History },
-      { id: 'stock_summary', label: 'Indent & RM Summary', icon: TrendingUp },
     ];
   }
 
