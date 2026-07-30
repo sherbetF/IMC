@@ -1537,28 +1537,46 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
                 const isOutOfStock = item.currentStock === 0;
                 const totalItemValRM = (item.currentStock * item.pricePerUnit).toFixed(2);
                 const expiryInfo = getExpiryInfo(item.expiryDate);
+                const isExpiring3Months = expiryInfo.status === 'EXPIRED' || (expiryInfo.status === 'EXPIRING_SOON' && expiryInfo.daysLeft <= 90);
+                const isExpiring6Months = expiryInfo.status !== 'EXPIRED' && expiryInfo.status === 'EXPIRING_SOON' && expiryInfo.daysLeft >= 120 && expiryInfo.daysLeft <= 180;
+
+                // Determine card glow class
+                let cardGlowClass = 'border-slate-200 hover:border-slate-300';
+                if (isOutOfStock) {
+                  cardGlowClass = 'border-red-400 bg-red-50/20 ring-1 ring-red-400 shadow-[0_0_15px_rgba(239,68,68,0.25)]';
+                } else if (isExpiring3Months) {
+                  cardGlowClass = 'border-red-300 bg-red-50/15 ring-1 ring-red-200 shadow-[0_0_15px_rgba(239,68,68,0.20)]';
+                } else if (isLowStock) {
+                  cardGlowClass = 'border-yellow-300 bg-yellow-50/25 ring-1 ring-yellow-300 shadow-[0_0_15px_rgba(234,179,8,0.25)]';
+                } else if (isExpiring6Months) {
+                  cardGlowClass = 'border-orange-300 bg-orange-50/15 ring-1 ring-orange-200 shadow-[0_0_15px_rgba(249,115,22,0.20)]';
+                }
 
                 return (
                   <div 
                     key={item.id}
-                    className={`bg-white rounded-2xl border p-5 flex flex-col justify-between transition-all duration-200 hover:shadow-lg relative overflow-hidden ${
-                      isOutOfStock
-                        ? 'border-rose-300 bg-rose-50/20 ring-1 ring-rose-300'
-                        : isLowStock 
-                          ? 'border-amber-300 bg-amber-50/20 ring-1 ring-amber-300' 
-                          : 'border-slate-200 hover:border-slate-300'
-                    }`}
+                    className={`bg-white rounded-2xl border p-5 flex flex-col justify-between transition-all duration-200 hover:shadow-lg relative overflow-hidden ${cardGlowClass}`}
                   >
-                    {/* Low Stock Warning Top Banner */}
+                    {/* Alert Banner */}
                     {isOutOfStock ? (
-                      <div className="bg-rose-600 text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 -mx-5 -mt-5 mb-3 flex items-center justify-between">
-                        <span className="flex items-center gap-1"><ShieldAlert className="w-3 h-3" /> OUT OF STOCK</span>
+                      <div className="bg-red-600 text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 -mx-5 -mt-5 mb-3 flex items-center justify-between">
+                        <span className="flex items-center gap-1"><ShieldAlert className="w-3 h-3 animate-pulse" /> OUT OF STOCK</span>
                         <span>0 {item.unit}</span>
                       </div>
+                    ) : isExpiring3Months ? (
+                      <div className="bg-red-500 text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 -mx-5 -mt-5 mb-3 flex items-center justify-between">
+                        <span className="flex items-center gap-1"><Clock className="w-3 h-3 animate-pulse" /> EXPIRING SOON (&lt; 3 MONTHS)</span>
+                        <span>{expiryInfo.daysLeft} Days Left</span>
+                      </div>
                     ) : isLowStock ? (
-                      <div className="bg-amber-500 text-slate-950 text-[10px] font-black uppercase tracking-wider px-3 py-1 -mx-5 -mt-5 mb-3 flex items-center justify-between">
-                        <span className="flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> LOW STOCK WARNING</span>
+                      <div className="bg-yellow-400 text-slate-950 text-[10px] font-black uppercase tracking-wider px-3 py-1 -mx-5 -mt-5 mb-3 flex items-center justify-between">
+                        <span className="flex items-center gap-1"><AlertTriangle className="w-3 h-3 animate-pulse" /> LOW STOCK WARNING</span>
                         <span>≤ {item.warningThreshold} {item.unit} Limit</span>
+                      </div>
+                    ) : isExpiring6Months ? (
+                      <div className="bg-orange-500 text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 -mx-5 -mt-5 mb-3 flex items-center justify-between">
+                        <span className="flex items-center gap-1"><Clock className="w-3 h-3 animate-pulse" /> EXPIRING SOON (4-6 MONTHS)</span>
+                        <span>{expiryInfo.daysLeft} Days Left</span>
                       </div>
                     ) : null}
 
@@ -1791,22 +1809,30 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
                       const isOutOfStock = item.currentStock === 0;
                       const totalItemValRM = (item.currentStock * item.pricePerUnit).toFixed(2);
                       const expiryInfo = getExpiryInfo(item.expiryDate);
+                      const isExpiring3Months = expiryInfo.status === 'EXPIRED' || (expiryInfo.status === 'EXPIRING_SOON' && expiryInfo.daysLeft <= 90);
+                      const isExpiring6Months = expiryInfo.status !== 'EXPIRED' && expiryInfo.status === 'EXPIRING_SOON' && expiryInfo.daysLeft >= 120 && expiryInfo.daysLeft <= 180;
+
+                      // Determine table row glow class
+                      let rowGlowClass = 'hover:bg-slate-50/80';
+                      if (isOutOfStock) {
+                        rowGlowClass = 'bg-red-100/80 hover:bg-red-200/80 shadow-[inset_6px_0_0_0_#dc2626]';
+                      } else if (isExpiring3Months) {
+                        rowGlowClass = 'bg-red-50 hover:bg-red-100/90 shadow-[inset_6px_0_0_0_#ef4444]';
+                      } else if (isLowStock) {
+                        rowGlowClass = 'bg-yellow-100/80 hover:bg-yellow-200/80 shadow-[inset_6px_0_0_0_#eab308]';
+                      } else if (isExpiring6Months) {
+                        rowGlowClass = 'bg-orange-100/80 hover:bg-orange-200/80 shadow-[inset_6px_0_0_0_#f97316]';
+                      }
 
                       return (
                         <tr 
                           key={item.id} 
-                          className={`hover:bg-slate-50/80 transition-colors ${
-                            isOutOfStock 
-                              ? 'bg-rose-50/30' 
-                              : isLowStock 
-                                ? 'bg-amber-50/30' 
-                                : ''
-                          }`}
+                          className={`transition-all duration-200 ${rowGlowClass}`}
                         >
                           {/* Column 1: Item Name & Category */}
                           <td className="py-3 px-4">
                             <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 rounded-lg bg-slate-100 border border-slate-200 overflow-hidden shrink-0 flex items-center justify-center">
+                              <div className="w-10 h-10 rounded-lg bg-slate-100 border border-slate-200 overflow-hidden shrink-0 flex items-center justify-center relative">
                                 {item.pictureUrl ? (
                                   <img 
                                     src={item.pictureUrl} 
@@ -1819,6 +1845,11 @@ export const StockTakeHub: React.FC<StockTakeHubProps> = ({ activeTab, setActive
                                 ) : (
                                   <Package className="w-5 h-5 text-slate-400" />
                                 )}
+                                {/* Glowing status badge */}
+                                {isOutOfStock && <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-red-600 rounded-full ring-2 ring-white animate-pulse" title="Out of Stock" />}
+                                {!isOutOfStock && isExpiring3Months && <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-red-500 rounded-full ring-2 ring-white animate-pulse" title="Expiring < 3 Months" />}
+                                {!isOutOfStock && !isExpiring3Months && isLowStock && <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-yellow-400 rounded-full ring-2 ring-white animate-pulse" title="Low Stock Warning" />}
+                                {!isOutOfStock && !isExpiring3Months && !isLowStock && isExpiring6Months && <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-orange-500 rounded-full ring-2 ring-white animate-pulse" title="Expiring 4-6 Months" />}
                               </div>
                               <div className="space-y-0.5">
                                 <h4 className="font-extrabold text-slate-900 leading-snug">
