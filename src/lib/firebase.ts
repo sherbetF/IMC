@@ -1,6 +1,6 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
+import { initializeFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import firebaseConfigJson from '../../firebase-applet-config.json';
 
@@ -36,10 +36,10 @@ const databaseId = (envDbId && envDbId !== '(default)')
   ? envDbId 
   : (configDbId || FALLBACK_CONFIG.firestoreDatabaseId || undefined);
 
-// Initialize Firestore with custom database ID if specified
+// Initialize Firestore with custom database ID if specified and enable long polling to bypass proxy/iframe connection limits
 export const db = (databaseId && databaseId !== '(default)')
-  ? getFirestore(app, databaseId)
-  : getFirestore(app);
+  ? initializeFirestore(app, { experimentalForceLongPolling: true }, databaseId)
+  : initializeFirestore(app, { experimentalForceLongPolling: true });
 
 // Initialize Firebase Storage
 const bucketName = (import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || firebaseConfigJson?.storageBucket || FALLBACK_CONFIG.storageBucket).trim();
