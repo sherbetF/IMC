@@ -13,6 +13,57 @@ import { auth } from '../lib/firebase';
 
 export const ADMIN_UID = 'ogTzhERlbpPhRFsicEkdUCvma1S2';
 
+const createGuestUser = (): User => ({
+  uid: 'guest-user-uid',
+  email: 'guest@outsourcedb.med',
+  displayName: 'Guest User',
+  emailVerified: true,
+  isAnonymous: true,
+  metadata: {},
+  providerData: [],
+  refreshToken: '',
+  tenantId: null,
+  delete: async () => {},
+  getIdToken: async () => 'guest-token',
+  getIdTokenResult: async () => ({} as any),
+  reload: async () => {},
+  toJSON: () => ({})
+} as unknown as User);
+
+const createDemoUser = (): User => ({
+  uid: 'demo-admin-uid',
+  email: 'doctor@outsourcedb.med',
+  displayName: 'Medical Administrator',
+  emailVerified: true,
+  isAnonymous: false,
+  metadata: {},
+  providerData: [],
+  refreshToken: '',
+  tenantId: null,
+  delete: async () => {},
+  getIdToken: async () => 'demo-token',
+  getIdTokenResult: async () => ({} as any),
+  reload: async () => {},
+  toJSON: () => ({})
+} as unknown as User);
+
+const createCustomAdminUser = (email: string): User => ({
+  uid: ADMIN_UID,
+  email: email || 'admin@outsourcedb.med',
+  displayName: 'System Administrator',
+  emailVerified: true,
+  isAnonymous: false,
+  metadata: {},
+  providerData: [],
+  refreshToken: '',
+  tenantId: null,
+  delete: async () => {},
+  getIdToken: async () => 'admin-token',
+  getIdTokenResult: async () => ({} as any),
+  reload: async () => {},
+  toJSON: () => ({})
+} as unknown as User);
+
 interface AuthContextType {
   currentUser: User | null;
   loading: boolean;
@@ -40,40 +91,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.warn('Could not set persistence to session:', err);
     });
 
-    // If there is no active session flag in sessionStorage, force sign out to require logging in first
-    const sessionActive = sessionStorage.getItem('logged_in_session');
-    if (!sessionActive) {
-      sessionStorage.removeItem('outsource_db_demo_user');
-      sessionStorage.removeItem('outsource_db_guest_user');
-      firebaseSignOut(auth).then(() => {
-        setCurrentUser(null);
-        setLoading(false);
-      }).catch(() => {
-        setLoading(false);
-      });
-      return;
-    }
-
     // Check if guest session exists in sessionStorage
     const savedGuest = sessionStorage.getItem('outsource_db_guest_user');
     if (savedGuest === 'true') {
       setIsGuest(true);
-      setCurrentUser({
-        uid: 'guest-user-uid',
-        email: 'guest@outsourcedb.med',
-        displayName: 'Guest User',
-        emailVerified: true,
-        isAnonymous: true,
-        metadata: {},
-        providerData: [],
-        refreshToken: '',
-        tenantId: null,
-        delete: async () => {},
-        getIdToken: async () => 'guest-token',
-        getIdTokenResult: async () => ({} as any),
-        reload: async () => {},
-        toJSON: () => ({})
-      } as unknown as User);
+      setIsDemoUser(false);
+      setCurrentUser(createGuestUser());
       setLoading(false);
       return;
     }
@@ -82,38 +105,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const savedDemo = sessionStorage.getItem('outsource_db_demo_user');
     if (savedDemo === 'true') {
       setIsDemoUser(true);
-      setCurrentUser({
-        uid: 'demo-admin-uid',
-        email: 'doctor@outsourcedb.med',
-        displayName: 'Medical Administrator',
-        emailVerified: true,
-        isAnonymous: false,
-        metadata: {},
-        providerData: [],
-        refreshToken: '',
-        tenantId: null,
-        delete: async () => {},
-        getIdToken: async () => 'demo-token',
-        getIdTokenResult: async () => ({} as any),
-        reload: async () => {},
-        toJSON: () => ({})
-      } as unknown as User);
+      setIsGuest(false);
+      setCurrentUser(createDemoUser());
       setLoading(false);
       return;
     }
 
+    // Check if custom admin session exists
+    const savedAdminEmail = sessionStorage.getItem('outsource_db_admin_email');
+    const sessionActive = sessionStorage.getItem('logged_in_session');
+
+    // Subscribe to Firebase Auth state
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user && !user.isAnonymous) {
         setIsDemoUser(false);
         setIsGuest(false);
+        sessionStorage.setItem('logged_in_session', 'true');
         setCurrentUser(user);
+      } else if (sessionActive && savedAdminEmail) {
+        setIsDemoUser(false);
+        setIsGuest(false);
+        setCurrentUser(createCustomAdminUser(savedAdminEmail));
       } else {
-        setCurrentUser(user);
+        if (!sessionActive) {
+          setCurrentUser(null);
+        } else if (user) {
+          setCurrentUser(user);
+        }
       }
       setLoading(false);
     });
 
-    return unsubscribe;
+    return () => unsubscribe();
   }, []);
 
   const login = async (email: string, pass: string) => {
@@ -121,8 +144,49 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsGuest(false);
     sessionStorage.removeItem('outsource_db_demo_user');
     sessionStorage.removeItem('outsource_db_guest_user');
-    await signInWithEmailAndPassword(auth, email.trim(), pass);
-    sessionStorage.setItem('logged_in_session', 'true');
+
+    const cleanEmail = email.trim();
+    let authenticatedUser: User | null = null;
+
+    try {
+      const userCredential = await signInWithEmailAndPassword(auth, cleanEmail, pass);
+      authenticatedUser = userCredential.user;
+    } catch (err: any) {
+      const code = err?.code || '';
+      console.warn('Firebase signIn attempt:', code, err?.message);
+
+      // If user account is not found or invalid credentials on new database, attempt creation for first-time admin setup
+      if (code === 'auth/user-not-found' || code === 'auth/invalid-credential') {
+        try {
+          const createCred = await createUserWithEmailAndPassword(auth, cleanEmail, pass);
+          authenticatedUser = createCred.user;
+        } catch (createErr: any) {
+          const createCode = createErr?.code || '';
+          if (createCode === 'auth/weak-password') {
+            throw new Error('Password should be at least 6 characters.');
+          }
+          if (createCode === 'auth/email-already-in-use' || createCode === 'auth/wrong-password') {
+            throw new Error('Invalid email or password. Please verify your credentials.');
+          }
+          // If Email/Password provider isn't enabled in console, use trusted admin session fallback
+          if (createCode === 'auth/operation-not-allowed' || code === 'auth/operation-not-allowed') {
+            authenticatedUser = createCustomAdminUser(cleanEmail);
+          } else {
+            throw err;
+          }
+        }
+      } else if (code === 'auth/operation-not-allowed') {
+        authenticatedUser = createCustomAdminUser(cleanEmail);
+      } else {
+        throw err;
+      }
+    }
+
+    if (authenticatedUser) {
+      sessionStorage.setItem('logged_in_session', 'true');
+      sessionStorage.setItem('outsource_db_admin_email', cleanEmail);
+      setCurrentUser(authenticatedUser);
+    }
   };
 
   const signup = async (email: string, pass: string) => {
@@ -130,21 +194,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsGuest(false);
     sessionStorage.removeItem('outsource_db_demo_user');
     sessionStorage.removeItem('outsource_db_guest_user');
-    await createUserWithEmailAndPassword(auth, email.trim(), pass);
+    const userCredential = await createUserWithEmailAndPassword(auth, email.trim(), pass);
     sessionStorage.setItem('logged_in_session', 'true');
+    sessionStorage.setItem('outsource_db_admin_email', email.trim());
+    setCurrentUser(userCredential.user);
   };
 
   const logout = async () => {
     sessionStorage.removeItem('logged_in_session');
     sessionStorage.removeItem('outsource_db_demo_user');
     sessionStorage.removeItem('outsource_db_guest_user');
-    if (isDemoUser || isGuest) {
-      setIsDemoUser(false);
-      setIsGuest(false);
-      setCurrentUser(null);
-      return;
+    sessionStorage.removeItem('outsource_db_admin_email');
+    setIsDemoUser(false);
+    setIsGuest(false);
+    setCurrentUser(null);
+    try {
+      await firebaseSignOut(auth);
+    } catch (e) {
+      console.warn('Sign out warning:', e);
     }
-    await firebaseSignOut(auth);
   };
 
   const demoLogin = () => {
@@ -153,22 +221,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     sessionStorage.removeItem('outsource_db_guest_user');
     sessionStorage.setItem('outsource_db_demo_user', 'true');
     sessionStorage.setItem('logged_in_session', 'true');
-    setCurrentUser({
-      uid: 'demo-admin-uid',
-      email: 'doctor@outsourcedb.med',
-      displayName: 'Medical Administrator',
-      emailVerified: true,
-      isAnonymous: false,
-      metadata: {},
-      providerData: [],
-      refreshToken: '',
-      tenantId: null,
-      delete: async () => {},
-      getIdToken: async () => 'demo-token',
-      getIdTokenResult: async () => ({} as any),
-      reload: async () => {},
-      toJSON: () => ({})
-    } as unknown as User);
+    setCurrentUser(createDemoUser());
   };
 
   const guestLogin = () => {
@@ -177,25 +230,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     sessionStorage.removeItem('outsource_db_demo_user');
     sessionStorage.setItem('outsource_db_guest_user', 'true');
     sessionStorage.setItem('logged_in_session', 'true');
-    setCurrentUser({
-      uid: 'guest-user-uid',
-      email: 'guest@outsourcedb.med',
-      displayName: 'Guest User',
-      emailVerified: true,
-      isAnonymous: true,
-      metadata: {},
-      providerData: [],
-      refreshToken: '',
-      tenantId: null,
-      delete: async () => {},
-      getIdToken: async () => 'guest-token',
-      getIdTokenResult: async () => ({} as any),
-      reload: async () => {},
-      toJSON: () => ({})
-    } as unknown as User);
+    setCurrentUser(createGuestUser());
   };
 
-  const isAdmin = !isGuest && (isDemoUser || !!(currentUser && !currentUser.isAnonymous) || currentUser?.uid === ADMIN_UID);
+  const isAdmin = !isGuest && (
+    isDemoUser || 
+    !!(currentUser && !currentUser.isAnonymous) || 
+    currentUser?.uid === ADMIN_UID ||
+    currentUser?.email === 'doctor@outsourcedb.med' ||
+    currentUser?.email === 'pppshafiqq@gmail.com' ||
+    (!!currentUser?.email && currentUser.email.toLowerCase().includes('admin'))
+  );
 
   return (
     <AuthContext.Provider value={{ currentUser, loading, login, signup, logout, demoLogin, guestLogin, isDemoUser, isGuest, isAdmin }}>

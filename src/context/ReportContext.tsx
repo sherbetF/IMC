@@ -33,7 +33,9 @@ interface ReportContextType {
   bulkDeleteReports: (ids: string[]) => Promise<void>;
   toggleCDROM: (id: string, hasCDROM: boolean) => Promise<void>;
   toggleClaimedStatus: (id: string, isClaimed: boolean) => Promise<void>;
+  toggleClaimed: (id: string, isClaimed: boolean) => Promise<void>;
   loadSampleDataset: (count?: number) => Promise<void>;
+  resetToDefaultReports: (count?: number) => Promise<void>;
   clearAllReports: () => Promise<void>;
   previewingReport: MedicalReport | null;
   setPreviewingReport: React.Dispatch<React.SetStateAction<MedicalReport | null>>;
@@ -509,7 +511,9 @@ export const ReportProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         bulkDeleteReports,
         toggleCDROM,
         toggleClaimedStatus,
+        toggleClaimed: toggleClaimedStatus,
         loadSampleDataset,
+        resetToDefaultReports: loadSampleDataset,
         clearAllReports,
         previewingReport,
         setPreviewingReport,

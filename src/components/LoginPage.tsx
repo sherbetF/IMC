@@ -25,6 +25,7 @@ export const LoginPage: React.FC = () => {
 
     try {
       await login(cleanEmail, password);
+      setIsAdminModalOpen(false);
     } catch (err: any) {
       console.error('Firebase Auth Error:', err?.code, err?.message);
       const code = err?.code || '';
