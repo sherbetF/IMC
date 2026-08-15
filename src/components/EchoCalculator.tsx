@@ -451,32 +451,43 @@ export const EchoCalculator: React.FC = () => {
             </p>
           </div>
 
-          {/* Rhythm Switcher Pill */}
-          <div className="bg-slate-950/80 p-1.5 rounded-2xl border border-indigo-500/30 flex items-center gap-1 shrink-0">
+          {/* Controls Bar: Rhythm Switcher & Reset Button */}
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            <div className="bg-slate-950/80 p-1.5 rounded-2xl border border-indigo-500/30 flex items-center gap-1">
+              <button
+                onClick={() => setRhythmMode('sinus')}
+                className={`px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all ${
+                  rhythmMode === 'sinus'
+                    ? 'bg-indigo-600 text-white shadow-xs'
+                    : 'text-indigo-200 hover:text-white hover:bg-white/10'
+                }`}
+              >
+                <Heart className="w-4 h-4" />
+                <span>Sinus Rhythm</span>
+              </button>
+              <button
+                onClick={() => {
+                  setRhythmMode('af');
+                  setExclusions(prev => ({ ...prev, af: true }));
+                }}
+                className={`px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all ${
+                  rhythmMode === 'af'
+                    ? 'bg-amber-500 text-slate-950 shadow-xs'
+                    : 'text-amber-200 hover:text-white hover:bg-white/10'
+                }`}
+              >
+                <Zap className="w-4 h-4" />
+                <span>Atrial Fibrillation (AF)</span>
+              </button>
+            </div>
+
             <button
-              onClick={() => setRhythmMode('sinus')}
-              className={`px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all ${
-                rhythmMode === 'sinus'
-                  ? 'bg-indigo-600 text-white shadow-xs'
-                  : 'text-indigo-200 hover:text-white hover:bg-white/10'
-              }`}
+              onClick={handleReset}
+              title="Clear all inputs and reset"
+              className="px-3.5 py-2.5 rounded-2xl text-xs font-bold flex items-center gap-1.5 bg-rose-500/20 hover:bg-rose-500/30 border border-rose-400/40 text-rose-200 hover:text-white transition-all shadow-xs cursor-pointer active:scale-95"
             >
-              <Heart className="w-4 h-4" />
-              <span>Sinus Rhythm</span>
-            </button>
-            <button
-              onClick={() => {
-                setRhythmMode('af');
-                setExclusions(prev => ({ ...prev, af: true }));
-              }}
-              className={`px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all ${
-                rhythmMode === 'af'
-                  ? 'bg-amber-500 text-slate-950 shadow-xs'
-                  : 'text-amber-200 hover:text-white hover:bg-white/10'
-              }`}
-            >
-              <Zap className="w-4 h-4" />
-              <span>Atrial Fibrillation (AF)</span>
+              <RefreshCw className="w-4 h-4 text-rose-300" />
+              <span>RESET</span>
             </button>
           </div>
         </div>
@@ -523,10 +534,10 @@ export const EchoCalculator: React.FC = () => {
             </div>
             <button
               onClick={handleReset}
-              className="text-xs text-slate-500 hover:text-indigo-600 font-bold flex items-center gap-1 bg-slate-50 hover:bg-slate-100 px-2.5 py-1.5 rounded-lg border border-slate-200 transition-all self-start sm:self-auto"
+              className="text-xs font-bold text-rose-700 hover:text-rose-800 flex items-center gap-1.5 bg-rose-50 hover:bg-rose-100 px-3 py-1.5 rounded-lg border border-rose-200/80 transition-all self-start sm:self-auto cursor-pointer active:scale-95 shadow-2xs"
             >
-              <RefreshCw className="w-3.5 h-3.5" />
-              <span>Reset parameters</span>
+              <RefreshCw className="w-3.5 h-3.5 text-rose-600" />
+              <span>RESET</span>
             </button>
           </div>
 
@@ -860,6 +871,19 @@ export const EchoCalculator: React.FC = () => {
               {/* Direct Overrides Removed */}
             </div>
 
+            {/* Bottom Reset Action Bar */}
+            <div className="pt-4 border-t border-slate-100 flex items-center justify-between gap-3">
+              <span className="text-xs text-slate-500 font-medium">
+                Done with patient assessment?
+              </span>
+              <button
+                onClick={handleReset}
+                className="text-xs font-bold text-rose-700 hover:text-rose-800 flex items-center gap-1.5 bg-rose-50 hover:bg-rose-100 px-3.5 py-2 rounded-xl border border-rose-200/80 transition-all cursor-pointer active:scale-95 shadow-2xs"
+              >
+                <RefreshCw className="w-3.5 h-3.5 text-rose-600" />
+                <span>RESET</span>
+              </button>
+            </div>
           </div>
         </div>
 
