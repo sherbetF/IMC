@@ -50,6 +50,20 @@ const MainAppContent: React.FC = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
 
+  // Disable mouse scroll wheel changing values in number inputs across the app
+  React.useEffect(() => {
+    const handleWheel = (e: WheelEvent) => {
+      const activeEl = document.activeElement;
+      if (activeEl instanceof HTMLInputElement && activeEl.type === 'number') {
+        activeEl.blur();
+      }
+    };
+    window.addEventListener('wheel', handleWheel, { passive: true });
+    return () => {
+      window.removeEventListener('wheel', handleWheel);
+    };
+  }, []);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">

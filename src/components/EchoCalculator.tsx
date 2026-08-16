@@ -562,6 +562,7 @@ export const EchoCalculator: React.FC = () => {
                     value={peakE}
                     onChange={(e) => setPeakE(e.target.value === '' ? '' : Math.max(0, parseFloat(e.target.value) || 0))}
                     onKeyDown={(e) => handleEchoKeyDown(e, 0, 0)}
+                    onWheel={(e) => e.currentTarget.blur()}
                     className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg font-mono font-bold text-slate-900 bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   />
                   {rhythmMode === 'af' && (
@@ -580,6 +581,7 @@ export const EchoCalculator: React.FC = () => {
                         value={peakA}
                         onChange={(e) => setPeakA(e.target.value === '' ? '' : Math.max(0, parseFloat(e.target.value) || 0))}
                         onKeyDown={(e) => handleEchoKeyDown(e, 1, 0)}
+                        onWheel={(e) => e.currentTarget.blur()}
                         className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg font-mono font-bold text-slate-900 bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                       />
                     </div>
@@ -602,6 +604,7 @@ export const EchoCalculator: React.FC = () => {
                       value={decelTime}
                       onChange={(e) => setDecelTime(e.target.value === '' ? '' : parseFloat(e.target.value))}
                       onKeyDown={(e) => handleEchoKeyDown(e, 1, 0)}
+                      onWheel={(e) => e.currentTarget.blur()}
                       className="w-full px-3 py-2 text-sm border border-amber-300 rounded-lg font-mono font-bold text-slate-900 bg-amber-50/30 focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
                     />
                     <p className="text-[10px] text-amber-700 font-bold">AF Criteria 4: Positive if DT ≤ 160 ms</p>
@@ -624,6 +627,7 @@ export const EchoCalculator: React.FC = () => {
                     value={septalEPrime}
                     onChange={(e) => setSeptalEPrime(e.target.value === '' ? '' : Math.max(0, parseFloat(e.target.value) || 0))}
                     onKeyDown={(e) => handleEchoKeyDown(e, 0, 1)}
+                    onWheel={(e) => e.currentTarget.blur()}
                     className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg font-mono font-bold text-slate-900 bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   />
                   <p className="text-[10px] text-slate-400">
@@ -640,6 +644,7 @@ export const EchoCalculator: React.FC = () => {
                     value={lateralEPrime}
                     onChange={(e) => setLateralEPrime(e.target.value === '' ? '' : Math.max(0, parseFloat(e.target.value) || 0))}
                     onKeyDown={(e) => handleEchoKeyDown(e, 1, 1)}
+                    onWheel={(e) => e.currentTarget.blur()}
                     className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg font-mono font-bold text-slate-900 bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   />
                   <p className="text-[10px] text-slate-400">
@@ -706,6 +711,7 @@ export const EchoCalculator: React.FC = () => {
                     value={trVelocity}
                     onChange={(e) => setTrVelocity(e.target.value === '' ? '' : Math.max(0, parseFloat(e.target.value) || 0))}
                     onKeyDown={(e) => handleEchoKeyDown(e, 2, 0)}
+                    onWheel={(e) => e.currentTarget.blur()}
                     className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg font-mono font-bold text-slate-900 bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   />
                   <p className="text-[10px] text-slate-400">Increased if &gt; 280 cm/s</p>
@@ -720,6 +726,7 @@ export const EchoCalculator: React.FC = () => {
                     value={pasp}
                     onChange={(e) => setPasp(e.target.value === '' ? '' : Math.max(0, parseFloat(e.target.value) || 0))}
                     onKeyDown={(e) => handleEchoKeyDown(e, 3, 0)}
+                    onWheel={(e) => e.currentTarget.blur()}
                     className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg font-mono font-bold text-slate-900 bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   />
                   <p className="text-[10px] text-slate-400">Increased if &gt; 35 mmHg</p>
@@ -771,6 +778,7 @@ export const EchoCalculator: React.FC = () => {
                     value={lars}
                     onChange={(e) => setLars(e.target.value === '' ? '' : parseFloat(e.target.value))}
                     onKeyDown={(e) => handleEchoKeyDown(e, 4, 0)}
+                    onWheel={(e) => e.currentTarget.blur()}
                     className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-lg font-mono font-bold text-slate-900 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   />
                   <p className="text-[10px] text-slate-400">Positive if &lt; 18%</p>
@@ -795,6 +803,7 @@ export const EchoCalculator: React.FC = () => {
                     value={pvSD}
                     onChange={(e) => setPvSD(e.target.value === '' ? '' : parseFloat(e.target.value))}
                     onKeyDown={(e) => handleEchoKeyDown(e, 4, 1)}
+                    onWheel={(e) => e.currentTarget.blur()}
                     className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-lg font-mono font-bold text-slate-900 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   />
                   <p className="text-[10px] text-slate-400">
@@ -819,6 +828,7 @@ export const EchoCalculator: React.FC = () => {
                       value={bmi}
                       onChange={(e) => setBmi(e.target.value === '' ? '' : parseFloat(e.target.value))}
                       onKeyDown={(e) => handleEchoKeyDown(e, 4, 2)}
+                      onWheel={(e) => e.currentTarget.blur()}
                       className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-lg font-mono font-bold text-slate-900 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                     />
                     <p className="text-[10px] text-slate-400">Positive if &gt; 30 kg/m²</p>
@@ -839,6 +849,7 @@ export const EchoCalculator: React.FC = () => {
                       value={lavi}
                       onChange={(e) => setLavi(e.target.value === '' ? '' : parseFloat(e.target.value))}
                       onKeyDown={(e) => handleEchoKeyDown(e, 4, 2)}
+                      onWheel={(e) => e.currentTarget.blur()}
                       className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-lg font-mono font-bold text-slate-900 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                     />
                     <p className="text-[10px] text-slate-400">Positive if &gt; 34 mL/m²</p>
@@ -861,6 +872,7 @@ export const EchoCalculator: React.FC = () => {
                     value={ivrt}
                     onChange={(e) => setIvrt(e.target.value === '' ? '' : parseFloat(e.target.value))}
                     onKeyDown={(e) => handleEchoKeyDown(e, 4, 3)}
+                    onWheel={(e) => e.currentTarget.blur()}
                     className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-lg font-mono font-bold text-slate-900 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   />
                   <p className="text-[10px] text-slate-400">Positive if ≤ 70 ms</p>
